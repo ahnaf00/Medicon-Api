@@ -1,9 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\AiTriageController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DoctorController;
+use App\Http\Controllers\Api\HospitalController;
 use App\Http\Controllers\Api\PrescriptionController;
+use App\Http\Controllers\Api\VitalController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -25,6 +28,8 @@ Route::prefix('auth')->group(function () {
 Route::get('/doctors', [DoctorController::class, 'index']);
 Route::get('/doctors/{id}', [DoctorController::class, 'show']);
 
+// Publicly search nearby hospitals & emergency facilities
+Route::get('/hospitals', [HospitalController::class, 'index']);
 
 // =========================================================================
 // 2. PROTECTED ROUTES (Requires Bearer Token via Sanctum)
@@ -38,11 +43,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- Appointments Domain ---
     Route::get('/appointments', [AppointmentController::class, 'index']);
-    Route::post('/appointments', [AppointmentController::class, 'store']);
     Route::patch('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
 
-    // --- Prescriptions Domain ---
-    Route::get('/prescriptions', [PrescriptionController::class, 'index']);
-    Route::post('/prescriptions', [PrescriptionController::class, 'store']);
+    // --- Patient-Restricted Routes ---
+    Route::middleware('role:patient')->group(function () {
+        Route::post('/appointments', [AppointmentController::class, 'store']);
+    });
 
+     // --- Doctor-Restricted Routes ---
+    Route::middleware('role:doctor')->group(function () {
+        Route::post('/prescriptions', [PrescriptionController::class, 'store']);
+    });
+
+    Route::get('/prescriptions', [PrescriptionController::class, 'index']);
+
+    // --- Vitals Tracking Domain & AI Symptom Triage Domain---
+    Route::get('/vitals', [VitalController::class, 'index']);
+    Route::post('/vitals', [VitalController::class, 'store']);
+    Route::post('/ai/triage', [AiTriageController::class, 'store']);
 });
