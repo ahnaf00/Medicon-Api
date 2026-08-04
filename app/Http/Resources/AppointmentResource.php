@@ -17,7 +17,7 @@ class AppointmentResource extends JsonResource
         return [
             'id'            => $this->id,
             'datetime'      => $this->appointment_datetime?->toIso8601String(),
-            'format'        => $this->format,
+            'format'        => $this->format === 'in_person' ? 'in-person' : $this->format,
             'status'        => $this->status,
             'notes'         => $this->notes,
             'doctor'        => new UserResource($this->whenLoaded('doctor')),
