@@ -76,4 +76,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(Billing::class,'patient_user_id');
     }
+
+    public function vitals():HasMany
+    {
+        return $this->hasMany(Vital::class, 'user_id');
+    }
+
+    public function aiTriageLogs():HasMany
+    {
+        return $this->hasMany(AiTriageLog::class, 'user_id');
+    }
 }
