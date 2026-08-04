@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Api\Vitals;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreVitalRequest extends FormRequest

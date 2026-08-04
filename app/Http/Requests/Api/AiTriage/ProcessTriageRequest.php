@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Api\AiTriage;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ProcessTriageRequest extends FormRequest
