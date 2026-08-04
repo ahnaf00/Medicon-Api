@@ -16,9 +16,10 @@ class PrescriptionItemResource extends JsonResource
     {
         return [
             'id'                => $this->id,
-            'medicine_name'     => $this->medicine_name,
+            'name'              => $this->medicine_name,
             'dosage'            => $this->dosage,
-            'dosage_schedule'   => $this->dosage_schedule,
+            'scheduleFormat'    => is_array($this->dosage_schedule) ? implode('/', array_keys(array_filter($this->dosage_schedule))) : null,
+            'dosageSchedule'    => $this->dosage_schedule,
             'instructions'      => $this->instructions,
             'duration_days'     => $this->duration_days,
         ];
