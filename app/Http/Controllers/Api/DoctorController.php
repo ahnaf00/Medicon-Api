@@ -13,20 +13,18 @@ class DoctorController extends Controller
     {
         $query = User::role('doctor')
                 ->whereHas('doctorProfile',function ($q){
-                    $q->where('verification_status','verfied');
+                    $q->where('verification_status','verified');
                 })->with('doctorProfile');
 
-        if($request->has('speciality'))
+        if($request->has('specialty'))
         {
             $query->whereHas('doctorProfile', function($q) use ($request){
-                $q->where('speciality','LIKE','%'.$request->query('speciality').'%');
+                $q->where('specialty','LIKE','%'.$request->query('specialty').'%');
             });
         }
 
         $doctors = $query->paginate(15);
-        return response()->json([
-            $doctors,200
-        ]);
+        return response()->json($doctors,200);
     }
 
     public function show(int $id):JsonResponse
