@@ -15,8 +15,7 @@ class PrescriptionController extends Controller
 {
     public function index(Request $request):AnonymousResourceCollection
     {
-        $prescriptions = Prescription::all();
-
+        $prescriptions = Prescription::with(['items', 'doctor.doctorProfile', 'patient.patientProfile'])->get();
         return PrescriptionResource::collection($prescriptions);
     }
 

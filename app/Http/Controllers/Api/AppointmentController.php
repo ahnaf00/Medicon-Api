@@ -14,7 +14,7 @@ class AppointmentController extends Controller
 {
     public function index(Request $request):AnonymousResourceCollection
     {
-        $appointments = Appointment::all();
+        $appointments = Appointment::with(['doctor.doctorProfile', 'patient.patientProfile'])->get();
 
         return AppointmentResource::collection($appointments);
     }
