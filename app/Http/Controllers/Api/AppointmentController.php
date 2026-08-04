@@ -4,31 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Appointments\StoreAppointmentRequest;
+use App\Http\Resources\AppointmentResource;
 use App\Models\Appointment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class AppointmentController extends Controller
 {
-    public function index(Request $request):JsonResponse
+    public function index(Request $request):AnonymousResourceCollection
     {
-        $user = $request->user();
+        $appointments = Appointment::all();
 
-        if($user->hasRole('doctor'))
-        {
-            $appointments = Appointment::where('doctor_user_id',$user->id)
-                            ->with(['patient','patient.patientProfile'])
-                            ->orderBy('appointment_datetime','asc')
-                            ->get();
-        }
-        else {
-            $appointments = Appointment::where('patient_user_id', $user->id)
-                ->with(['doctor', 'doctor.doctorProfile'])
-                ->orderBy('appointment_datetime', 'asc')
-                ->get();
-        }
-
-        return response()->json(['appointments' => $appointments],200);
+        return AppointmentResource::collection($appointments);
     }
 
     public function store(StoreAppointmentRequest $request):JsonResponse

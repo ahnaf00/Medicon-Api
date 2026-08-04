@@ -4,32 +4,20 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Prescriptions\StorePrescriptionRequest;
+use App\Http\Resources\PrescriptionResource;
 use App\Models\Prescription;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 
 class PrescriptionController extends Controller
 {
-    public function index(Request $request):JsonResponse
+    public function index(Request $request):AnonymousResourceCollection
     {
-        $user = $request->user();
+        $prescriptions = Prescription::all();
 
-        if($user->hasRole('doctor'))
-        {
-            $prescriptions = Prescription::where('doctor_user_id',$user->id)
-                            ->with(['items','patient'])
-                            ->latest()
-                            ->get();
-        }else
-        {
-            $prescriptions = Prescription::where('patient_user_id',$user->id)
-                            ->with(['items','doctor','doctor.doctorProfile'])
-                            ->latest()
-                            ->get();
-        }
-
-        return response()->json(['prescriptions' => $prescriptions],200);
+        return PrescriptionResource::collection($prescriptions);
     }
 
     public function store(StorePrescriptionRequest $request): JsonResponse

@@ -3,36 +3,26 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class DoctorController extends Controller
 {
-    public function index(Request $request):JsonResponse
+    public function index():AnonymousResourceCollection
     {
-        $query = User::role('doctor')
-                ->whereHas('doctorProfile',function ($q){
-                    $q->where('verification_status','verified');
-                })->with('doctorProfile');
+        $doctors = User::role('doctor')->with('doctorProfile')->get();
 
-        if($request->has('specialty'))
-        {
-            $query->whereHas('doctorProfile', function($q) use ($request){
-                $q->where('specialty','LIKE','%'.$request->query('specialty').'%');
-            });
-        }
-
-        $doctors = $query->paginate(15);
-        return response()->json($doctors,200);
+        return UserResource::collection($doctors);
     }
 
-    public function show(int $id):JsonResponse
+    public function show(int $id):UserResource
     {
         $doctor = User::role('doctor')
                 ->with('doctorProfile')
                 ->findOrFail($id);
 
-        return response()->json(['doctor' => $doctor]);
-    }
+            return new UserResource($doctor);
+        }
 }

@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Auth\LoginRequest;
 use App\Http\Requests\Api\Auth\RegisterRequest;
+use App\Http\Resources\UserResource;
 use App\Models\DoctorProfile;
 use App\Models\PatientProfile;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Attributes\UseResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -107,18 +109,11 @@ class AuthController extends Controller
         ], 200);
     }
 
-    public function  me(Request $request):JsonResponse
+    public function  me(Request $request):UserResource
     {
         $user = $request->user();
-        $user->load([
-            'patientProfile',
-            'doctorProfile',
-            'roles'
-        ]);
 
-        return response()->json([
-            'user' => $user,
-        ],200);
+        return new UserResource($user);
     }
 
     public function logout(Request $request):JsonResponse
