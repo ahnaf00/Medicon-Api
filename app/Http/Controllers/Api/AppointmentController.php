@@ -21,6 +21,12 @@ class AppointmentController extends Controller
                             ->orderBy('appointment_datetime','asc')
                             ->get();
         }
+        else {
+            $appointments = Appointment::where('patient_user_id', $user->id)
+                ->with(['doctor', 'doctor.doctorProfile'])
+                ->orderBy('appointment_datetime', 'asc')
+                ->get();
+        }
 
         return response()->json(['appointments' => $appointments],200);
     }
@@ -53,6 +59,8 @@ class AppointmentController extends Controller
                             $q->where('patient_user_id',$user->id)
                             ->orWhere('doctor_user_id',$user->id);
                         })->firstOrFail();
+
+        $appointment->update(['status' => 'cancelled']);
 
         return response()->json([
             'message' => 'Appointment cancelled successfully.',
