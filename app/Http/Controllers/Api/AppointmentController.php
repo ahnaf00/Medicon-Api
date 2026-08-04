@@ -14,9 +14,21 @@ class AppointmentController extends Controller
 {
     public function index(Request $request):AnonymousResourceCollection
     {
-        $appointments = Appointment::with(['doctor.doctorProfile', 'patient.patientProfile'])->get();
+        $user = $request->user();
 
-        return AppointmentResource::collection($appointments);
+        $appointments = Appointment::with(['doctor.doctorProfile', 'patient.patientProfile'])->orderBy('appointment_datetime','asc');
+
+        if($user->hasRole('doctor'))
+        {
+            $appointments->where('doctor_user_id',$user->id);
+        }
+        else
+        {
+            $appointments->where('patient_user_id',$user->id);
+        }
+
+        return AppointmentResource::collection($appointments->get());
+
     }
 
     public function store(StoreAppointmentRequest $request):JsonResponse
