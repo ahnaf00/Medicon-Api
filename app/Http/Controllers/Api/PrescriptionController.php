@@ -15,8 +15,19 @@ class PrescriptionController extends Controller
 {
     public function index(Request $request):AnonymousResourceCollection
     {
-        $prescriptions = Prescription::with(['items', 'doctor.doctorProfile', 'patient.patientProfile'])->get();
-        return PrescriptionResource::collection($prescriptions);
+        $user = $request->user();
+
+        $prescriptions = Prescription::with(['items', 'doctor.doctorProfile', 'patient.patientProfile'])->latest();
+
+        if($user->hasRole('doctor'))
+        {
+            $prescriptions->where('doctor_user_id',$user->id);
+        }
+        else
+        {
+            $prescriptions->where('patient_user_id',$user->id);
+        }
+        return PrescriptionResource::collection($prescriptions->get());
     }
 
     public function store(StorePrescriptionRequest $request): JsonResponse
