@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AiChatController;
 use App\Http\Controllers\Api\AiTriageController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
@@ -82,6 +83,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/conversations/{id}/messages', [ConversationController::class, 'messages']);
         Route::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage']);
 
+        // --- AI Chat Domain ---
+        Route::middleware('throttle:ai')->group(function () {
+            Route::post('/ai/chat', [AiChatController::class, 'chat']);
+            Route::get('/ai/sessions', [AiChatController::class, 'sessions']);
+            Route::get('/ai/sessions/{id}/messages', [AiChatController::class, 'messages']);
+        });
     });
 
 }); // end v1
