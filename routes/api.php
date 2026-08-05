@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\HospitalController;
 use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\MedicineController;
+use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\VitalController;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +68,8 @@ Route::prefix('v1')->group(function () {
         // --- Doctor-Restricted Routes ---
         Route::middleware('role:doctor')->group(function () {
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
+            Route::get('/patients', [PatientController::class, 'index']);
+
         });
 
         Route::get('/prescriptions', [PrescriptionController::class, 'index']);

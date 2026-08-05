@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Api\Auth;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateProfileRequest extends FormRequest
