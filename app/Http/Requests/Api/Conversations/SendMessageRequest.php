@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Api\Conversations;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SendMessageRequest extends FormRequest

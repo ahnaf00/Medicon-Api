@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Api\MedicalRecords;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CheckInteractionRequest extends FormRequest
@@ -15,11 +14,6 @@ class CheckInteractionRequest extends FormRequest
         return (bool) $this->user();
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
