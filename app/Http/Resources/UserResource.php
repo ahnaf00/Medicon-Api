@@ -23,6 +23,7 @@ class UserResource extends JsonResource
             'role'              => $this->getRoleNames()->first(),
             'doctorProfile'     => new DoctorProfileResource($this->whenLoaded('doctorProfile')),
             'patientProfile'    => new PatientProfileResource($this->whenLoaded('patientProfile')),
+            'avatarUrl'         => $this->avatar_url,
             'createdAt'         => $this->created_at?->toIso8601String(),
         ];
     }
