@@ -21,7 +21,7 @@ class PrescriptionItemResource extends JsonResource
             'scheduleFormat'    => is_array($this->dosage_schedule) ? implode('/', array_keys(array_filter($this->dosage_schedule))) : null,
             'dosageSchedule'    => $this->dosage_schedule,
             'instructions'      => $this->instructions,
-            'duration_days'     => $this->duration_days,
+            'durationDays'      => $this->duration_days,
         ];
     }
 }

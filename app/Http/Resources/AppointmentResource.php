@@ -22,7 +22,7 @@ class AppointmentResource extends JsonResource
             'notes'         => $this->notes,
             'doctor'        => new UserResource($this->whenLoaded('doctor')),
             'patient'       => new UserResource($this->whenLoaded('patient')),
-            'created_at'    => $this->created_at?->toIso8601String(),
+            'createdAt'     => $this->created_at?->toIso8601String(),
         ];
     }
 }

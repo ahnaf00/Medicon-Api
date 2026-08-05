@@ -16,10 +16,10 @@ class PatientProfileResource extends JsonResource
     {
         return [
             'id'                    => $this->id,
-            'date_of_birth'         => $this->date_of_birth?->format('Y-m-d'),
+            'dateOfBirth'           => $this->date_of_birth?->format('Y-m-d'),
             'gender'                => $this->gender,
-            'blood_group'           => $this->blood_group,
-            'emergency_contact'     => $this->emergency_contact,
+            'bloodGroup'            => $this->blood_group,
+            'emergencyContact'      => $this->emergency_contact,
             'address'               => $this->address,
         ];
     }
