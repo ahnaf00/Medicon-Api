@@ -6,8 +6,7 @@ use Illuminate\Support\Facades\Http;
 
 class OpenFdaService
 {
-    // Fix: Set the direct path to the JSON endpoint
-    private const BASE_URL = 'https://fda.gov';
+    private const BASE_URL = 'https://api.fda.gov/drug/label.json';
 
     public function searchDrug(string $query): array
     {
