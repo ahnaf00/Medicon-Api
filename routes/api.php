@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\HospitalController;
+use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\VitalController;
 use Illuminate\Support\Facades\Route;
@@ -70,6 +71,10 @@ Route::prefix('v1')->group(function () {
         // --- AI Symptom Triage (stricter rate limit) ---
         Route::post('/ai/triage', [AiTriageController::class, 'store'])
             ->middleware('throttle:ai');
+
+        // --- Medical Records Domain ---
+        Route::apiResource('medical-records', MedicalRecordController::class)->except(['update']);
+
     });
 
 }); // end v1
