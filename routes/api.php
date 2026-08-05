@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AiTriageController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\DoctorAvailabilityController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\HospitalController;
 use App\Http\Controllers\Api\MedicalRecordController;
@@ -37,6 +38,7 @@ Route::prefix('v1')->group(function () {
     // Publicly browse doctors and doctor details
     Route::get('/doctors', [DoctorController::class, 'index']);
     Route::get('/doctors/{id}', [DoctorController::class, 'show']);
+    Route::get('/doctors/{id}/slots', [DoctorAvailabilityController::class, 'slots']);
 
     // Publicly search nearby hospitals & emergency facilities
     Route::get('/hospitals', [HospitalController::class, 'index']);
