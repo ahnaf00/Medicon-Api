@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AiTriageController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\HospitalController;
 use App\Http\Controllers\Api\MedicalRecordController;
@@ -74,6 +75,12 @@ Route::prefix('v1')->group(function () {
 
         // --- Medical Records Domain ---
         Route::apiResource('medical-records', MedicalRecordController::class)->except(['update']);
+
+        // --- Conversations / Q&A Domain ---
+        Route::get('/conversations', [ConversationController::class, 'index']);
+        Route::post('/conversations', [ConversationController::class, 'store']);
+        Route::get('/conversations/{id}/messages', [ConversationController::class, 'messages']);
+        Route::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage']);
 
     });
 
