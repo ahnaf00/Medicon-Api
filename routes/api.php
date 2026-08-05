@@ -49,6 +49,8 @@ Route::prefix('v1')->group(function () {
 
         // --- User Profile & Auth ---
         Route::get('/user/me', [AuthController::class, 'me']);
+        Route::put('/user/me', [AuthController::class, 'updateProfile']);
+        Route::post('/user/avatar', [AuthController::class, 'uploadAvatar']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
         // --- Appointments Domain ---
