@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\HospitalController;
 use App\Http\Controllers\Api\MedicalRecordController;
+use App\Http\Controllers\Api\MedicineController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\VitalController;
 use Illuminate\Support\Facades\Route;
@@ -89,6 +90,12 @@ Route::prefix('v1')->group(function () {
             Route::get('/ai/sessions', [AiChatController::class, 'sessions']);
             Route::get('/ai/sessions/{id}/messages', [AiChatController::class, 'messages']);
         });
+
+        // --- Medicine / Drug Domain ---
+        Route::get('/medicines/search', [MedicineController::class, 'search']);
+        Route::post('/medicines/interactions', [MedicineController::class, 'checkInteractions']);
     });
 
-}); // end v1
+});
+
+
