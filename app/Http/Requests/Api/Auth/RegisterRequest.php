@@ -18,9 +18,9 @@ class RegisterRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone'],
-            'password' => ['required', 'string', 'min:6'],
+            'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['required', 'string', 'max:20', 'unique:users,phone'],
+            'password' => ['nullable', 'string', 'min:6'],
             'role' => ['required', 'string', 'in:patient,doctor'],
 
             // Doctor-specific optional onboarding fields
@@ -32,6 +32,10 @@ class RegisterRequest extends FormRequest
             'date_of_birth' => ['nullable', 'date'],
             'gender' => ['nullable', 'in:male,female,other'],
             'blood_group' => ['nullable', 'in:A+,A-,B+,B-,AB+,AB-,O+,O-'],
+            'height_cm' => ['nullable', 'numeric', 'min:0'],
+            'weight_kg' => ['nullable', 'numeric', 'min:0'],
+            'allergies' => ['nullable', 'string'],
+            'chronic_conditions' => ['nullable', 'string'],
         ];
     }
 }

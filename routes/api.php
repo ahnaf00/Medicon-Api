@@ -31,7 +31,9 @@ Route::prefix('v1')->group(function () {
     // 1. PUBLIC ROUTES (Unauthenticated)
     // =====================================================================
 
-    Route::prefix('auth')->middleware('throttle:auth')->group(function () {
+    Route::prefix('auth')->middleware('throttle:6,1')->group(function () {
+        Route::post('/send-otp', [AuthController::class, 'sendOtp']);
+        Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
     });

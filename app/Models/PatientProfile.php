@@ -17,6 +17,10 @@ class PatientProfile extends Model
         'blood_group',
         'emergency_contact',
         'address',
+        'height_cm',
+        'weight_kg',
+        'allergies',
+        'chronic_conditions',
     ];
     protected $casts = [
         'date_of_birth' => 'date',

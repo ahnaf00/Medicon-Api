@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Auth\LoginRequest;
 use App\Http\Requests\Api\Auth\RegisterRequest;
 use App\Http\Requests\Api\Auth\UpdateProfileRequest;
+use App\Http\Requests\Api\Auth\SendOtpRequest;
+use App\Http\Requests\Api\Auth\VerifyOtpRequest;
 use App\Http\Resources\UserResource;
 use App\Models\DoctorProfile;
 use App\Models\PatientProfile;
+use App\Models\PhoneOtp;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,9 +29,9 @@ class AuthController extends Controller
         $user = DB::transaction(function () use ($validated) {
             $user = User::create([
                 'name' => $validated['name'],
-                'email' => $validated['email'],
+                'email' => $validated['email'] ?? null,
                 'phone' => $validated['phone'] ?? null,
-                'password' => Hash::make($validated['password']),
+                'password' => isset($validated['password']) ? Hash::make($validated['password']) : null,
                 'status' => $validated['role'] === 'doctor' ? 'pending' : 'active',
             ]);
 
@@ -48,6 +51,10 @@ class AuthController extends Controller
                     'date_of_birth' => $validated['date_of_birth'] ?? null,
                     'gender' => $validated['gender'] ?? null,
                     'blood_group' => $validated['blood_group'] ?? null,
+                    'height_cm' => $validated['height_cm'] ?? null,
+                    'weight_kg' => $validated['weight_kg'] ?? null,
+                    'allergies' => $validated['allergies'] ?? null,
+                    'chronic_conditions' => $validated['chronic_conditions'] ?? null,
                 ]);
             }
 
@@ -68,6 +75,74 @@ class AuthController extends Controller
                 'status' => $user->status,
             ]
         ], 201);
+    }
+
+    public function sendOtp(SendOtpRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $phone = $validated['phone'];
+
+        $otp = app()->environment('local') ? '123456' : sprintf("%06d", mt_rand(1, 999999));
+        
+        \Illuminate\Support\Facades\Log::info("OTP for {$phone} is {$otp}");
+
+        PhoneOtp::updateOrCreate(
+            ['phone' => $phone],
+            [
+                'otp' => Hash::make($otp),
+                'attempts' => 0,
+                'expires_at' => now()->addMinutes(5)
+            ]
+        );
+
+        return response()->json(['message' => 'OTP sent successfully.'], 200);
+    }
+
+    public function verifyOtp(VerifyOtpRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $phone = $validated['phone'];
+
+        $otpRecord = PhoneOtp::where('phone', $phone)->first();
+
+        if (!$otpRecord || now()->greaterThan($otpRecord->expires_at)) {
+            return response()->json(['message' => 'OTP expired or invalid.'], 400);
+        }
+
+        if ($otpRecord->attempts >= 3) {
+            $otpRecord->delete();
+            return response()->json(['message' => 'Max attempts reached. Request a new OTP.'], 429);
+        }
+
+        if (!Hash::check($validated['otp'], $otpRecord->otp)) {
+            $otpRecord->increment('attempts');
+            return response()->json(['message' => 'Invalid OTP.'], 400);
+        }
+
+        $otpRecord->delete();
+
+        $user = User::where('phone', $phone)->first();
+
+        if (!$user) {
+            return response()->json(['isNewUser' => true], 200);
+        }
+
+        if ($user->status === 'suspended') {
+            return response()->json(['message' => 'Account is suspended'], 403);
+        }
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'isNewUser' => false,
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => [
+                'id' => $user->id,
+                'role' => $user->getRoleNames()->first(),
+                'status' => $user->status,
+            ]
+        ], 200);
     }
 
     public function login(LoginRequest $request): JsonResponse
