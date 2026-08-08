@@ -17,8 +17,9 @@ class StoreConversationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'doctor_user_id' => ['required', 'exists:users,id'],
+            'doctor_user_id' => ['nullable', 'exists:users,id'],
             'subject'        => ['nullable', 'string', 'max:255'],
+            'department'     => ['required', 'string', 'max:255'],
         ];
     }
 }

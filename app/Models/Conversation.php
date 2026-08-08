@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Conversation extends Model
 {
-    protected $fillable = ['patient_user_id', 'doctor_user_id', 'subject', 'status'];
+    protected $fillable = ['patient_user_id', 'doctor_user_id', 'subject', 'status', 'department'];
     public function patient(): BelongsTo
     {
         return $this->belongsTo(User::class, 'patient_user_id');
@@ -25,5 +25,10 @@ class Conversation extends Model
     public function latestMessage(): HasOne
     {
         return $this->hasOne(Message::class)->latestOfMany();
+    }
+
+    public function firstMessage(): HasOne
+    {
+        return $this->hasOne(Message::class)->oldestOfMany();
     }
 }

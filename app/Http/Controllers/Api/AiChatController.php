@@ -9,6 +9,8 @@ use App\Models\AiChatSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class AiChatController extends Controller
 {
@@ -26,9 +28,8 @@ class AiChatController extends Controller
         // Store user message
         $session->messages()->create(['role' => 'user', 'content' => $request->message]);
 
-        // === PLACEHOLDER: Replace this block with real LLM API call ===
+        // Call Gemini AI engine
         $reply = $this->generateReply($request->message);
-        // ==============================================================
 
         $aiMessage = $session->messages()->create(['role' => 'assistant', 'content' => $reply]);
 
@@ -57,18 +58,36 @@ class AiChatController extends Controller
         return AiChatMessageResource::collection($session->messages()->oldest()->paginate(50));
     }
 
-    // =====================================================================
-    // PLACEHOLDER ENGINE — swap with OpenAI / Gemini client when ready
-    // =====================================================================
     private function generateReply(string $userMessage): string
     {
-        $msg = strtolower($userMessage);
-        if (str_contains($msg, 'appointment'))
-            return 'You can book an appointment through the Schedule tab. Would you like me to help you find a suitable doctor?';
-        if (str_contains($msg, 'prescription'))
-            return 'Prescriptions are issued by your doctor after a consultation. Please book an appointment to get started.';
-        if (str_contains($msg, 'emergency'))
-            return 'If this is an emergency, please call your local emergency services immediately or use the Emergency SOS feature in the app.';
-        return 'I understand your concern. For accurate medical advice, please consult with one of our qualified doctors. Can I help you book an appointment?';
+        try {
+            $apiKey = config('services.gemini.api_key');
+
+            $response = Http::timeout(15)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={$apiKey}", [
+                'system_instruction' => [
+                    'parts' => [
+                        ['text' => 'You are MediCon AI, a friendly and helpful health assistant for the MediCon patient app. You help patients understand symptoms, explain medical terms in simple language, and provide general health guidance. Always remind users that your advice is not a substitute for professional medical consultation. Keep responses concise (under 200 words). If the situation sounds urgent or life-threatening, strongly advise them to call emergency services or use the Emergency SOS feature in the app.']
+                    ]
+                ],
+                'contents' => [
+                    [
+                        'parts' => [
+                            ['text' => $userMessage]
+                        ]
+                    ]
+                ]
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['candidates'][0]['content']['parts'][0]['text'] ?? 'Sorry, I could not understand the response.';
+            }
+
+            Log::error('Gemini API Error: ' . $response->body());
+            return 'I am currently experiencing technical difficulties. Please try again later.';
+        } catch (\Exception $e) {
+            Log::error('Gemini API Exception: ' . $e->getMessage());
+            return 'I am currently experiencing technical difficulties. Please try again later.';
+        }
     }
 }
