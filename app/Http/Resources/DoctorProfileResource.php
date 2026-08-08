@@ -24,6 +24,7 @@ class DoctorProfileResource extends JsonResource
             'rating'                => (float) $this->rating,
             'bio'                   => $this->bio,
             'verificationStatus'    => $this->verification_status,
+            'followUpFee'           => (float) $this->follow_up_fee,
         ];
     }
 }
