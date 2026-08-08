@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\MedicineController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\VitalController;
+use App\Http\Controllers\Api\DoctorDashboardController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -69,6 +70,7 @@ Route::prefix('v1')->group(function () {
 
         // --- Doctor-Restricted Routes ---
         Route::middleware('role:doctor')->group(function () {
+            Route::get('/doctor/dashboard', [DoctorDashboardController::class, 'index']);
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
             Route::get('/patients', [PatientController::class, 'index']);
 

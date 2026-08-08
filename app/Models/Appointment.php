@@ -15,6 +15,7 @@ class Appointment extends Model
         'patient_user_id',
         'doctor_user_id',
         'appointment_datetime',
+        'duration_minutes',
         'format',
         'status',
         'notes',

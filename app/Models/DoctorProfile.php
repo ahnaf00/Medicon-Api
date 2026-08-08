@@ -15,6 +15,7 @@ class DoctorProfile extends Model
         'qualification',
         'experience_years',
         'consultation_fee',
+        'follow_up_fee',
         'rating',
         'bio',
         'verification_status',
