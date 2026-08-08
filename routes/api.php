@@ -73,9 +73,12 @@ Route::prefix('v1')->group(function () {
             Route::get('/doctor/dashboard', [DoctorDashboardController::class, 'index']);
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
             Route::get('/patients', [PatientController::class, 'index']);
+            Route::get('/patients/{id}', [PatientController::class, 'show']);
 
             Route::get('/doctor/availability', [DoctorAvailabilityController::class, 'mySlots']);
             Route::put('/doctor/availability', [DoctorAvailabilityController::class, 'updateSlots']);
+            Route::get('/doctor/exceptions', [DoctorAvailabilityController::class, 'getExceptions']);
+            Route::post('/doctor/exceptions/toggle', [DoctorAvailabilityController::class, 'toggleException']);
 
         });
 

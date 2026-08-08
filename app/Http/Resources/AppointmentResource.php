@@ -15,14 +15,15 @@ class AppointmentResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'            => $this->id,
-            'datetime'      => $this->appointment_datetime?->toIso8601String(),
-            'format'        => $this->format === 'in_person' ? 'in-person' : $this->format,
-            'status'        => $this->status,
-            'notes'         => $this->notes,
-            'doctor'        => new UserResource($this->whenLoaded('doctor')),
-            'patient'       => new UserResource($this->whenLoaded('patient')),
-            'createdAt'     => $this->created_at?->toIso8601String(),
+            'id'              => $this->id,
+            'datetime'        => $this->appointment_datetime?->toIso8601String(),
+            'format'          => $this->format === 'in_person' ? 'in-person' : $this->format,
+            'status'          => $this->status,
+            'notes'           => $this->notes,
+            'durationMinutes' => $this->duration_minutes,
+            'doctor'          => new UserResource($this->whenLoaded('doctor')),
+            'patient'         => new UserResource($this->whenLoaded('patient')),
+            'createdAt'       => $this->created_at?->toIso8601String(),
         ];
     }
 }
