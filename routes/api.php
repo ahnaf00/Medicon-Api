@@ -74,6 +74,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
             Route::get('/patients', [PatientController::class, 'index']);
 
+            Route::get('/doctor/availability', [DoctorAvailabilityController::class, 'mySlots']);
+            Route::put('/doctor/availability', [DoctorAvailabilityController::class, 'updateSlots']);
+
         });
 
         Route::get('/prescriptions', [PrescriptionController::class, 'index']);
