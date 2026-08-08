@@ -58,4 +58,21 @@ class PrescriptionController extends Controller
             'prescription'  => $prescription->load('items'),
         ], 201);
     }
+
+    public function show(Request $request, $id): JsonResponse|PrescriptionResource
+    {
+        $user = $request->user();
+
+        $prescription = Prescription::with(['items', 'doctor.doctorProfile', 'patient.patientProfile'])->findOrFail($id);
+
+        // Security check: only allow if user is the patient or the doctor of this prescription
+        if ($user->hasRole('doctor') && $prescription->doctor_user_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized access to prescription'], 403);
+        }
+        if ($user->hasRole('patient') && $prescription->patient_user_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized access to prescription'], 403);
+        }
+
+        return new PrescriptionResource($prescription);
+    }
 }
