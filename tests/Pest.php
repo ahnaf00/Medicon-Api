@@ -48,3 +48,34 @@ function something()
 {
     // ..
 }
+
+function makePatient(array $profile = []): \App\Models\User
+{
+    $user = \App\Models\User::factory()->create();
+    $user->assignRole('patient');
+    \App\Models\PatientProfile::factory()->create(['user_id' => $user->id] + $profile);
+
+    return $user;
+}
+
+function makeDoctor(string $verification = 'verified', string $specialty = 'Cardiology'): \App\Models\User
+{
+    $user = \App\Models\User::factory()->create();
+    $user->assignRole('doctor');
+    \App\Models\DoctorProfile::factory()->create([
+        'user_id' => $user->id,
+        'specialty' => $specialty,
+        'verification_status' => $verification,
+    ]);
+
+    return $user;
+}
+
+function bookAppointment(\App\Models\User $patient, \App\Models\User $doctor): \App\Models\Appointment
+{
+    return \App\Models\Appointment::factory()->create([
+        'patient_user_id' => $patient->id,
+        'doctor_user_id' => $doctor->id,
+        'status' => 'scheduled',
+    ]);
+}

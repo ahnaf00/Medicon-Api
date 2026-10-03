@@ -7,6 +7,7 @@ use App\Models\Appointment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Gate;
 
 class PatientController extends Controller
 {
@@ -29,15 +30,12 @@ class PatientController extends Controller
 
     public function show(Request $request, $id)
     {
-        // Ideally we should check if the doctor has an appointment with this patient
-        // but for now, we just return the patient profile.
         $patient = User::where('id', $id)->with('patientProfile')->firstOrFail();
-        
-        // Ensure they have the patient role (or at least are a valid user being viewed as a patient)
-        if (!$patient->hasRole('patient')) {
-            // some users might not have roles properly set in testing, so this is optional
-            // abort(403, 'User is not a patient.');
-        }
+
+        abort_if($patient->patientProfile === null, 404);
+
+        // The doctor must have an appointment with this patient.
+        Gate::authorize('view', $patient->patientProfile);
 
         return new UserResource($patient);
     }

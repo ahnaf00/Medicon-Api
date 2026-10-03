@@ -11,6 +11,7 @@ use App\Models\Conversation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Gate;
 
 class ConversationController extends Controller
 {
@@ -20,12 +21,18 @@ class ConversationController extends Controller
         
         $query = Conversation::with(['patient', 'doctor', 'latestMessage', 'firstMessage']);
         
-        if ($request->has('department')) {
-            // Doctor fetching inbox
-            $query->where(function ($q) use ($request, $user) {
-                $q->where('department', $request->department)
-                  ->whereNull('doctor_user_id')
-                  ->orWhere('doctor_user_id', $user->id);
+        if ($user->hasRole('doctor')) {
+            // Doctor inbox: questions assigned to them, plus unassigned ones in their
+            // own specialty once verified. The client's ?department is not trusted.
+            $query->where(function ($q) use ($user) {
+                $q->where('doctor_user_id', $user->id);
+
+                if ($user->isVerifiedDoctor()) {
+                    $q->orWhere(function ($q) use ($user) {
+                        $q->whereNull('doctor_user_id')
+                          ->where('department', $user->doctorProfile->specialty);
+                    });
+                }
             });
         } else {
             // Patient fetching their questions
@@ -56,13 +63,9 @@ class ConversationController extends Controller
     public function messages(Request $request, $id): AnonymousResourceCollection
     {
         $user = $request->user();
-        $conversation = Conversation::where('id', $id)
-            ->where(function($q) use ($user) {
-                $q->where('patient_user_id', $user->id)
-                  ->orWhere('doctor_user_id', $user->id)
-                  ->orWhereNull('doctor_user_id');
-            })
-            ->firstOrFail();
+        $conversation = Conversation::findOrFail($id);
+
+        Gate::authorize('view', $conversation);
 
         // Mark unread messages as read for the current user
         $conversation->messages()
@@ -77,13 +80,9 @@ class ConversationController extends Controller
     public function sendMessage(SendMessageRequest $request, $id): JsonResponse
     {
         $user = $request->user();
-        $conversation = Conversation::where('id', $id)
-            ->where(function($q) use ($user) {
-                $q->where('patient_user_id', $user->id)
-                  ->orWhere('doctor_user_id', $user->id)
-                  ->orWhereNull('doctor_user_id');
-            })
-            ->firstOrFail();
+        $conversation = Conversation::findOrFail($id);
+
+        Gate::authorize('reply', $conversation);
 
         // If a doctor answers an unassigned question, they claim it
         if ($conversation->patient_user_id !== $user->id && !$conversation->doctor_user_id) {

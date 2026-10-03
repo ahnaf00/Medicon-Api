@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class PrescriptionController extends Controller
 {
@@ -34,6 +35,13 @@ class PrescriptionController extends Controller
     {
         $validated = $request->validated();
         $doctor = $request->user();
+
+        Gate::authorize('create', [
+            Prescription::class,
+            (int) $validated['patient_user_id'],
+            isset($validated['appointment_id']) ? (int) $validated['appointment_id'] : null,
+        ]);
+
         $prescription = DB::transaction(function () use ($validated, $doctor) {
             $prescription = Prescription::create([
                 'appointment_id'        => $validated['appointment_id'] ?? null,
@@ -59,19 +67,12 @@ class PrescriptionController extends Controller
         ], 201);
     }
 
-    public function show(Request $request, $id): JsonResponse|PrescriptionResource
+    public function show(Request $request, $id): PrescriptionResource
     {
-        $user = $request->user();
-
         $prescription = Prescription::with(['items', 'doctor.doctorProfile', 'patient.patientProfile'])->findOrFail($id);
 
-        // Security check: only allow if user is the patient or the doctor of this prescription
-        if ($user->hasRole('doctor') && $prescription->doctor_user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized access to prescription'], 403);
-        }
-        if ($user->hasRole('patient') && $prescription->patient_user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized access to prescription'], 403);
-        }
+        // Only the prescription's patient or prescribing doctor may read it.
+        Gate::authorize('view', $prescription);
 
         return new PrescriptionResource($prescription);
     }

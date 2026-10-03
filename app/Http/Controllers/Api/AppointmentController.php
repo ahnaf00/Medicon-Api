@@ -9,6 +9,7 @@ use App\Models\Appointment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Gate;
 
 class AppointmentController extends Controller
 {
@@ -52,13 +53,9 @@ class AppointmentController extends Controller
 
     public function cancel(Request $request, $id):JsonResponse
     {
-        $user = $request->user();
+        $appointment = Appointment::findOrFail($id);
 
-        $appointment = Appointment::where('id',$id)
-                        ->where(function ($q) use ($user) {
-                            $q->where('patient_user_id',$user->id)
-                            ->orWhere('doctor_user_id',$user->id);
-                        })->firstOrFail();
+        Gate::authorize('cancel', $appointment);
 
         $appointment->update(['status' => 'cancelled']);
 

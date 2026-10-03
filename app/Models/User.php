@@ -48,6 +48,22 @@ class User extends Authenticatable
         return $this->hasOne(DoctorProfile::class,'user_id');
     }
 
+    public function isVerifiedDoctor(): bool
+    {
+        return $this->hasRole('doctor')
+            && $this->doctorProfile?->verification_status === 'verified';
+    }
+
+    /**
+     * A doctor may only access a patient's data once the patient has booked with them.
+     */
+    public function hasAppointmentWithPatient(int $patientUserId): bool
+    {
+        return $this->appointmentsAsDoctor()
+            ->where('patient_user_id', $patientUserId)
+            ->exists();
+    }
+
     public function appointmentsAsPatient():HasMany
     {
         return $this->hasMany(Appointment::class,'patient_user_id');
