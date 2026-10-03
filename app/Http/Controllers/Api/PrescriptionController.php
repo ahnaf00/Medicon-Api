@@ -7,8 +7,10 @@ use App\Http\Requests\Api\Prescriptions\StorePrescriptionRequest;
 use App\Http\Resources\PrescriptionDocumentResource;
 use App\Http\Resources\PrescriptionResource;
 use App\Models\Prescription;
+use App\Services\PrescriptionPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -85,6 +87,23 @@ class PrescriptionController extends Controller
     public function document(Request $request, $id): PrescriptionDocumentResource
     {
         return new PrescriptionDocumentResource($this->findViewable($id));
+    }
+
+    /**
+     * Stream the rendered prescription. Only `pdf` is rendered server-side; the
+     * image download is captured on the device from the document payload.
+     */
+    public function download(Request $request, PrescriptionPdfService $pdfService, $id): Response
+    {
+        $request->validate(['format' => ['sometimes', 'in:pdf']]);
+
+        $prescription = $this->findViewable($id);
+
+        return response($pdfService->renderPdf($prescription), 200, [
+            'Content-Type'          => 'application/pdf',
+            'Content-Disposition'   => 'attachment; filename="'.$pdfService->filename($prescription).'"',
+            'Cache-Control'         => 'private, no-store',
+        ]);
     }
 
     private function findViewable($id): Prescription

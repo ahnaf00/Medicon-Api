@@ -11,6 +11,7 @@
     "require": {
         "php": "^8.3",
         "andreaselia/laravel-api-to-postman": "^2.3",
+        "barryvdh/laravel-dompdf": "^3.1",
         "laravel/framework": "^13.8",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
