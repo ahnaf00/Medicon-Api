@@ -5,9 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\Billing;
+use App\Services\DoctorSlotService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
 
 class DoctorDashboardController extends Controller
 {
@@ -21,6 +22,13 @@ class DoctorDashboardController extends Controller
         }
 
         $doctorProfile = $user->doctorProfile;
+
+        // "Today" and "this month" are clinic (Dhaka) calendar periods. Timestamps are
+        // stored in UTC, so each period becomes a UTC [start, end) range.
+        $today = DoctorSlotService::today();
+        $todayRange = $this->utcRange($today, $today->copy()->addDay());
+        $thisMonthRange = $this->utcRange($today->copy()->startOfMonth(), $today->copy()->startOfMonth()->addMonth());
+        $previousMonthRange = $this->utcRange($today->copy()->startOfMonth()->subMonth(), $today->copy()->startOfMonth());
 
         // 1. Fees
         $fees = [
@@ -36,8 +44,8 @@ class DoctorDashboardController extends Controller
 
         $thisMonthAvg = Appointment::where('doctor_user_id', $user->id)
             ->whereNotNull('duration_minutes')
-            ->whereMonth('appointment_datetime', Carbon::now()->month)
-            ->whereYear('appointment_datetime', Carbon::now()->year)
+            ->where('appointment_datetime', '>=', $thisMonthRange[0])
+            ->where('appointment_datetime', '<', $thisMonthRange[1])
             ->avg('duration_minutes');
 
         $timeMetrics = [
@@ -47,38 +55,16 @@ class DoctorDashboardController extends Controller
 
         // 3. Earnings Overview
         // Earnings are calculated from Billings associated with this doctor's appointments
-        $todayEarnings = Billing::whereHas('appointment', function ($query) use ($user) {
-                $query->where('doctor_user_id', $user->id);
-            })
-            ->whereDate('created_at', Carbon::today())
-            ->where('payment_status', 'paid')
-            ->sum('amount');
-
-        $thisMonthEarnings = Billing::whereHas('appointment', function ($query) use ($user) {
-                $query->where('doctor_user_id', $user->id);
-            })
-            ->whereMonth('created_at', Carbon::now()->month)
-            ->whereYear('created_at', Carbon::now()->year)
-            ->where('payment_status', 'paid')
-            ->sum('amount');
-
-        $previousMonthEarnings = Billing::whereHas('appointment', function ($query) use ($user) {
-                $query->where('doctor_user_id', $user->id);
-            })
-            ->whereMonth('created_at', Carbon::now()->subMonth()->month)
-            ->whereYear('created_at', Carbon::now()->subMonth()->year)
-            ->where('payment_status', 'paid')
-            ->sum('amount');
-
         $earnings = [
-            'today' => $todayEarnings,
-            'this_month' => $thisMonthEarnings,
-            'previous_month' => $previousMonthEarnings,
+            'today' => $this->paidEarnings($user->id, $todayRange),
+            'this_month' => $this->paidEarnings($user->id, $thisMonthRange),
+            'previous_month' => $this->paidEarnings($user->id, $previousMonthRange),
         ];
 
         // 4. Quick Appointment Stats (Bonus)
         $todayAppointmentsCount = Appointment::where('doctor_user_id', $user->id)
-            ->whereDate('appointment_datetime', Carbon::today())
+            ->where('appointment_datetime', '>=', $todayRange[0])
+            ->where('appointment_datetime', '<', $todayRange[1])
             ->where('status', '!=', 'cancelled')
             ->count();
 
@@ -88,5 +74,22 @@ class DoctorDashboardController extends Controller
             'earnings' => $earnings,
             'today_appointments_count' => $todayAppointmentsCount,
         ]);
+    }
+
+    /** @return array{0: Carbon, 1: Carbon} */
+    private function utcRange(Carbon $start, Carbon $end): array
+    {
+        return [$start->copy()->utc(), $end->copy()->utc()];
+    }
+
+    private function paidEarnings(int $doctorId, array $range): float
+    {
+        return (float) Billing::whereHas('appointment', function ($query) use ($doctorId) {
+                $query->where('doctor_user_id', $doctorId);
+            })
+            ->where('created_at', '>=', $range[0])
+            ->where('created_at', '<', $range[1])
+            ->where('payment_status', 'paid')
+            ->sum('amount');
     }
 }
