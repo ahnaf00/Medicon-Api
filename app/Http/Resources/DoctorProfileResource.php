@@ -27,7 +27,7 @@ class DoctorProfileResource extends JsonResource
             'bio'                   => $this->bio,
             'verificationStatus'    => $this->verification_status,
             'followUpFee'           => (float) $this->follow_up_fee,
-            'isOnline'              => (bool) $this->is_online,
+            'isOnline'              => $this->resource->isOnlineNow(),
             // Only present when computed for ranking (symptom search), so other endpoints don't pay for them.
             'completedConsultations' => $this->when(
                 array_key_exists('completed_consultations_count', $this->resource?->getAttributes() ?? []),

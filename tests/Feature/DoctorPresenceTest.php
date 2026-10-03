@@ -33,11 +33,56 @@ it('starts offline and persists the toggle', function () {
 
 it('exposes isOnline on the public doctor profile', function () {
     $doctor = makeDoctor();
-    $doctor->doctorProfile->update(['is_online' => true]);
+    $doctor->doctorProfile->update(['is_online' => true, 'last_seen_at' => now()]);
 
     $this->getJson("/api/v1/doctors/{$doctor->id}")
         ->assertOk()
         ->assertJsonFragment(['isOnline' => true]);
+});
+
+it('lapses to offline when the app stops checking in', function () {
+    $doctor = makeDoctor();
+
+    $this->actingAs($doctor, 'sanctum')
+        ->postJson('/api/v1/doctor/presence', ['is_online' => true])
+        ->assertJsonPath('isOnline', true);
+
+    $this->travel(4)->minutes();
+    $this->getJson('/api/v1/doctor/presence')->assertJsonPath('isOnline', true);
+
+    $this->travel(2)->minutes();
+    $this->getJson('/api/v1/doctor/presence')->assertJsonPath('isOnline', false);
+    $this->getJson("/api/v1/doctors/{$doctor->id}")->assertJsonFragment(['isOnline' => false]);
+
+    // Turning the toggle on again brings the doctor back online.
+    $this->postJson('/api/v1/doctor/presence', ['is_online' => true])
+        ->assertJsonPath('isOnline', true);
+});
+
+it('keeps an online doctor online with heartbeats', function () {
+    $doctor = makeDoctor();
+
+    $this->actingAs($doctor, 'sanctum')
+        ->postJson('/api/v1/doctor/presence', ['is_online' => true]);
+
+    foreach (range(1, 3) as $_) {
+        $this->travel(4)->minutes();
+        $this->postJson('/api/v1/doctor/presence/heartbeat')->assertOk()->assertJsonPath('isOnline', true);
+    }
+});
+
+it('never switches a doctor on from a heartbeat', function () {
+    $doctor = makeDoctor();
+
+    $this->actingAs($doctor, 'sanctum')
+        ->postJson('/api/v1/doctor/presence', ['is_online' => false]);
+
+    // e.g. a beat sent just before "go offline" that arrives just after it
+    $this->postJson('/api/v1/doctor/presence/heartbeat')
+        ->assertOk()
+        ->assertJsonPath('isOnline', false);
+
+    expect($doctor->doctorProfile->fresh()->is_online)->toBeFalse();
 });
 
 it('requires a boolean', function () {

@@ -78,6 +78,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/doctor/dashboard', [DoctorDashboardController::class, 'index']);
             Route::get('/doctor/presence', [DoctorPresenceController::class, 'show']);
             Route::post('/doctor/presence', [DoctorPresenceController::class, 'update']);
+            Route::post('/doctor/presence/heartbeat', [DoctorPresenceController::class, 'heartbeat']);
             Route::patch('/appointments/{id}/status', [AppointmentController::class, 'updateStatus']);
             Route::put('/consultations/{appointmentId}/summary', [ConsultationController::class, 'upsert']);
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
