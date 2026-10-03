@@ -185,7 +185,8 @@ class AuthController extends Controller
 
     public function me(Request $request): UserResource
     {
-        $user = $request->user();
+        // Same shape as updateProfile: the client reads qualifications etc. from these.
+        $user = $request->user()->loadMissing(['patientProfile', 'doctorProfile']);
 
         return new UserResource($user);
     }
