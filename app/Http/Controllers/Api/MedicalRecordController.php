@@ -9,6 +9,8 @@ use App\Models\MedicalRecord;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 
 class MedicalRecordController extends Controller
 {
@@ -24,12 +26,14 @@ class MedicalRecordController extends Controller
 
     public function store(StoreMedicalRecordRequest $request): JsonResponse
     {
-        // Store file to the 'medical-records' disk folder
-        $path = $request->file('file')->store('medical-records', 'public');
+        // Private disk: the file is only reachable through a signed URL from the resource.
+        $path = $request->file('file')->store('medical-records', 'private');
+        abort_if($path === false, 500, 'The file could not be stored.');
+
         $record = MedicalRecord::create([
             'patient_user_id'       => $request->user()->id,
             'recorded_by_user_id'   => $request->user()->id,
-            'file_url'              => asset('storage/' . $path),
+            'file_path'             => $path,
             'notes'                 => $request->input('notes'),
         ]);
 
@@ -41,22 +45,24 @@ class MedicalRecordController extends Controller
 
     public function show(Request $request, $id): JsonResponse
     {
-        $record = MedicalRecord::where('id', $id)
-            ->where('patient_user_id', $request->user()->id)
-            ->with('recordedBy')
-            ->firstOrFail();
+        $record = MedicalRecord::with('recordedBy')->findOrFail($id);
+
+        Gate::authorize('view', $record);
 
         return response()->json(['record' => new MedicalRecordResource($record)]);
     }
+
     public function destroy(Request $request, $id): JsonResponse
     {
-        $record = MedicalRecord::where('id', $id)
-            ->where('patient_user_id', $request->user()->id)
-            ->firstOrFail();
-        // Optionally delete the physical file here:
-        // Storage::disk('public')->delete(str_replace(asset('storage/'), '', $record->file_url));
+        $record = MedicalRecord::findOrFail($id);
+
+        Gate::authorize('delete', $record);
+
+        if ($record->file_path) {
+            Storage::disk('private')->delete($record->file_path);
+        }
         $record->delete();
-        
+
         return response()->json(['message' => 'Medical record deleted.']);
     }
 }

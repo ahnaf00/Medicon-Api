@@ -17,6 +17,7 @@ class MedicalRecord extends Model
         'glucose_level',
         'oxygen_saturation',
         'file_url',
+        'file_path',
         'notes',
     ];
     protected $casts = [

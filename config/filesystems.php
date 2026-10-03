@@ -38,6 +38,18 @@ return [
             'report' => false,
         ],
 
+        // Patient documents (medical records, generated PDFs). Never publicly reachable:
+        // files are only served through short-lived signed URLs (temporaryUrl).
+        'private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private'),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/private-files',
+            'visibility' => 'private',
+            'serve' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class MedicalRecordResource extends JsonResource
 {
@@ -16,7 +17,10 @@ class MedicalRecordResource extends JsonResource
     {
         return [
             'id'              => $this->id,
-            'fileUrl'         => $this->file_url,
+            // Short-lived signed URL to the private file; legacy rows fall back to file_url.
+            'fileUrl'         => $this->file_path
+                ? Storage::disk('private')->temporaryUrl($this->file_path, now()->addMinutes(15))
+                : $this->file_url,
             'bloodPressure'   => $this->blood_pressure,
             'pulseRate'       => $this->pulse_rate,
             'glucoseLevel'    => $this->glucose_level ? (float) $this->glucose_level : null,
