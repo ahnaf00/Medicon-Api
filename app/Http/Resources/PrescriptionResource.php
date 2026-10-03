@@ -18,10 +18,17 @@ class PrescriptionResource extends JsonResource
             'id'                => $this->id,
             'appointmentId'     => $this->appointment_id,
             'diagnosisSummary'  => $this->diagnosis_summary,
+            'followUpDate'      => $this->follow_up_date?->format('Y-m-d'),
+            'advice'            => $this->advice,
             'status'            => $this->status,
             'doctor'            => new UserResource($this->whenLoaded('doctor')),
             'patient'           => new UserResource($this->whenLoaded('patient')),
             'medicines'         => PrescriptionItemResource::collection($this->whenLoaded('items')),
+            'tests'             => $this->whenLoaded('tests', fn () => $this->tests->map(fn ($test) => [
+                'id'            => $test->id,
+                'name'          => $test->name,
+                'instructions'  => $test->instructions,
+            ])->values()),
             'createdAt'         => $this->created_at?->toIso8601String(),
         ];
     }

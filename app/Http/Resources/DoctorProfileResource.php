@@ -18,6 +18,8 @@ class DoctorProfileResource extends JsonResource
             'id'                    => $this->id,
             'specialty'             => $this->specialty,
             'qualification'         => $this->qualification,
+            'bmdcRegistrationNo'    => $this->bmdc_registration_no,
+            'hospitalName'          => $this->hospital_name,
             'experience'            => $this->experience_years ? "{$this->experience_years}" : 'N/A',
             'experienceYears'       => (int) $this->experience_years,
             'consultationFee'       => (float) $this->consultation_fee,

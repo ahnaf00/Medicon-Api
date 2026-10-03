@@ -84,6 +84,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/prescriptions', [PrescriptionController::class, 'index']);
         Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show']);
+        Route::get('/prescriptions/{id}/document', [PrescriptionController::class, 'document']);
 
         // --- Vitals Tracking Domain ---
         Route::get('/vitals', [VitalController::class, 'index']);

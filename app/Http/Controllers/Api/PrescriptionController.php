@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Prescriptions\StorePrescriptionRequest;
+use App\Http\Resources\PrescriptionDocumentResource;
 use App\Http\Resources\PrescriptionResource;
 use App\Models\Prescription;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,7 @@ class PrescriptionController extends Controller
     {
         $user = $request->user();
 
-        $prescriptions = Prescription::with(['items', 'doctor.doctorProfile', 'patient.patientProfile'])->latest();
+        $prescriptions = Prescription::with(['items', 'tests', 'doctor.doctorProfile', 'patient.patientProfile'])->latest();
 
         if($user->hasRole('doctor'))
         {
@@ -78,11 +79,21 @@ class PrescriptionController extends Controller
 
     public function show(Request $request, $id): PrescriptionResource
     {
-        $prescription = Prescription::with(['items', 'doctor.doctorProfile', 'patient.patientProfile'])->findOrFail($id);
+        return new PrescriptionResource($this->findViewable($id));
+    }
+
+    public function document(Request $request, $id): PrescriptionDocumentResource
+    {
+        return new PrescriptionDocumentResource($this->findViewable($id));
+    }
+
+    private function findViewable($id): Prescription
+    {
+        $prescription = Prescription::with(['items', 'tests', 'doctor.doctorProfile', 'patient.patientProfile'])->findOrFail($id);
 
         // Only the prescription's patient or prescribing doctor may read it.
         Gate::authorize('view', $prescription);
 
-        return new PrescriptionResource($prescription);
+        return $prescription;
     }
 }

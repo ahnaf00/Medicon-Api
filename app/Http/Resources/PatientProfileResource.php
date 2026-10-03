@@ -21,6 +21,10 @@ class PatientProfileResource extends JsonResource
             'bloodGroup'            => $this->blood_group,
             'emergencyContact'      => $this->emergency_contact,
             'address'               => $this->address,
+            'weightKg'              => $this->weight_kg !== null ? (float) $this->weight_kg : null,
+            'heightCm'              => $this->height_cm !== null ? (float) $this->height_cm : null,
+            'allergies'             => $this->allergies,
+            'chronicConditions'     => $this->chronic_conditions,
         ];
     }
 }
