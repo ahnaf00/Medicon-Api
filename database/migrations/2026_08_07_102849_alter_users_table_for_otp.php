@@ -18,9 +18,21 @@ return new class extends Migration
         });
 
         // Safely alter the enum
-        DB::statement("ALTER TABLE users MODIFY COLUMN status ENUM('active', 'suspend', 'suspended', 'pending') DEFAULT 'active'");
-        DB::statement("UPDATE users SET status = 'suspended' WHERE status = 'suspend'");
-        DB::statement("ALTER TABLE users MODIFY COLUMN status ENUM('active', 'suspended', 'pending') DEFAULT 'active'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN status ENUM('active', 'suspend', 'suspended', 'pending') DEFAULT 'active'");
+            DB::statement("UPDATE users SET status = 'suspended' WHERE status = 'suspend'");
+            DB::statement("ALTER TABLE users MODIFY COLUMN status ENUM('active', 'suspended', 'pending') DEFAULT 'active'");
+            return;
+        }
+
+        // Portable equivalent for other drivers (e.g. the SQLite test database).
+        Schema::table('users', function (Blueprint $table) {
+            $table->enum('status', ['active', 'suspend', 'suspended', 'pending'])->default('active')->change();
+        });
+        DB::table('users')->where('status', 'suspend')->update(['status' => 'suspended']);
+        Schema::table('users', function (Blueprint $table) {
+            $table->enum('status', ['active', 'suspended', 'pending'])->default('active')->change();
+        });
     }
 
     /**
@@ -33,8 +45,19 @@ return new class extends Migration
             $table->string('password')->nullable(false)->change();
         });
 
-        DB::statement("ALTER TABLE users MODIFY COLUMN status ENUM('active', 'suspend', 'suspended', 'pending') DEFAULT 'active'");
-        DB::statement("UPDATE users SET status = 'suspend' WHERE status = 'suspended'");
-        DB::statement("ALTER TABLE users MODIFY COLUMN status ENUM('active', 'suspend', 'pending') DEFAULT 'active'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN status ENUM('active', 'suspend', 'suspended', 'pending') DEFAULT 'active'");
+            DB::statement("UPDATE users SET status = 'suspend' WHERE status = 'suspended'");
+            DB::statement("ALTER TABLE users MODIFY COLUMN status ENUM('active', 'suspend', 'pending') DEFAULT 'active'");
+            return;
+        }
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->enum('status', ['active', 'suspend', 'suspended', 'pending'])->default('active')->change();
+        });
+        DB::table('users')->where('status', 'suspended')->update(['status' => 'suspend']);
+        Schema::table('users', function (Blueprint $table) {
+            $table->enum('status', ['active', 'suspend', 'pending'])->default('active')->change();
+        });
     }
 };
