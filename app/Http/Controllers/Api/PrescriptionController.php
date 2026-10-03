@@ -7,6 +7,7 @@ use App\Http\Requests\Api\Prescriptions\StorePrescriptionRequest;
 use App\Http\Resources\PrescriptionDocumentResource;
 use App\Http\Resources\PrescriptionResource;
 use App\Models\Prescription;
+use App\Services\MedicineExplainerService;
 use App\Services\PrescriptionPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,8 @@ use Illuminate\Http\Response;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+
+use function Illuminate\Support\defer;
 
 class PrescriptionController extends Controller
 {
@@ -34,7 +37,7 @@ class PrescriptionController extends Controller
         return PrescriptionResource::collection($prescriptions->get());
     }
 
-    public function store(StorePrescriptionRequest $request): JsonResponse
+    public function store(StorePrescriptionRequest $request, MedicineExplainerService $explainer): JsonResponse
     {
         $validated = $request->validated();
         $doctor = $request->user();
@@ -73,6 +76,11 @@ class PrescriptionController extends Controller
             }
             return $prescription;
         });
+
+        // Write the "Why take this medicine?" text after the response is sent,
+        // so the doctor never waits on the model.
+        defer(fn () => $explainer->explainPrescription($prescription));
+
         return response()->json([
             'message'       => 'Prescription issued successfully.',
             'prescription'  => $prescription->load(['items', 'tests']),

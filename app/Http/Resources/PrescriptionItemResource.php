@@ -22,6 +22,7 @@ class PrescriptionItemResource extends JsonResource
             'dosageSchedule'    => $this->dosage_schedule,
             'instructions'      => $this->instructions,
             'durationDays'      => $this->duration_days,
+            'explanation'       => $this->explanation,
         ];
     }
 }
