@@ -2,10 +2,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Appointment;
 use App\Models\User;
 use App\Models\DoctorAvailability;
 use App\Models\DoctorScheduleException;
+use App\Services\DoctorSlotService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,9 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 class DoctorAvailabilityController extends Controller
 {
-    private const SLOT_DURATION = 30;  // minutes
-
-    public function slots(Request $request, int $id): JsonResponse
+    public function slots(Request $request, int $id, DoctorSlotService $slotService): JsonResponse
     {
         $request->validate([
             'date' => ['required', 'date', 'after_or_equal:today', 'before:+30 days'],
@@ -26,116 +24,22 @@ class DoctorAvailabilityController extends Controller
             ->findOrFail($id);
 
         $date = Carbon::parse($request->query('date'));
-        $dateString = $date->toDateString();
-        
-        $dayOfWeek = $date->dayOfWeek; // 0 (Sunday) to 6 (Saturday)
+        $slots = $slotService->slotsOn($id, $date);
 
-        $availability = DoctorAvailability::where('doctor_user_id', $id)
-            ->where('day_of_week', $dayOfWeek)
-            ->first();
-
-        // If doctor has no availability config, fallback to 9-5 weekday default to prevent breaking
-        $startTime = '09:00:00';
-        $endTime = '17:00:00';
-        $isActive = !in_array($dayOfWeek, [5, 6]); // Default non-working: Fri, Sat
-
-        if ($availability) {
-            $startTime = $availability->start_time;
-            $endTime = $availability->end_time;
-            $isActive = $availability->is_active;
-        }
-
-        // Fetch daily exceptions
-        $exceptions = DoctorScheduleException::where('doctor_user_id', $id)
-            ->whereDate('date', $dateString)
-            ->get();
-
-        $disabledTimes = $exceptions->where('type', 'disabled')->pluck('time')->map(fn($t) => Carbon::parse($t)->format('H:i'))->toArray();
-        $addedTimes = $exceptions->where('type', 'added')->pluck('time')->map(fn($t) => Carbon::parse($t)->format('H:i'))->toArray();
-
-        // If clinic is NOT active today, only show the "added" custom slots (if any)
-        $rawSlots = [];
-        if ($isActive) {
-            $rawSlots = $this->generateSlots($date, $startTime, $endTime);
-        }
-
-        // Add custom exception slots
-        foreach ($addedTimes as $timeStr) {
-            if (!in_array($timeStr, $rawSlots)) {
-                $rawSlots[] = $timeStr;
-            }
-        }
-
-        // Remove disabled slots
-        $finalRawSlots = array_values(array_filter($rawSlots, function($timeStr) use ($disabledTimes) {
-            return !in_array($timeStr, $disabledTimes);
-        }));
-
-        // Sort by time
-        usort($finalRawSlots, function($a, $b) {
-            return strtotime($a) - strtotime($b);
-        });
-
-        if (empty($finalRawSlots)) {
-            return response()->json([
-                'doctorId'        => $id,
-                'doctorName'      => $doctor->name,
-                'consultationFee' => (float) $doctor->doctorProfile?->consultation_fee,
-                'date'            => $dateString,
-                'slotDuration'    => self::SLOT_DURATION,
-                'slots'           => [],
-                'note'            => 'Doctor is not available on this day.',
-            ]);
-        }
-
-        // Fetch booked datetimes
-        $bookedTimes = Appointment::where('doctor_user_id', $id)
-            ->whereDate('appointment_datetime', $dateString)
-            ->whereIn('status', ['scheduled', 'completed', 'in-progress'])
-            ->pluck('appointment_datetime')
-            ->map(fn($dt) => Carbon::parse($dt)->format('H:i'))
-            ->toArray();
-
-        // Build response format
-        $slots = [];
-        foreach ($finalRawSlots as $timeStr) {
-            // Re-parse time for iso string
-            $parts = explode(':', $timeStr);
-            $dt = $date->copy()->setTime((int)$parts[0], (int)$parts[1]);
-            
-            $slots[] = [
-                'time'      => $timeStr,
-                'datetime'  => $dt->toIso8601String(),
-                'available' => !in_array($timeStr, $bookedTimes),
-            ];
-        }
-
-        return response()->json([
+        $payload = [
             'doctorId'        => $id,
             'doctorName'      => $doctor->name,
             'consultationFee' => (float) $doctor->doctorProfile?->consultation_fee,
-            'date'            => $dateString,
-            'slotDuration'    => self::SLOT_DURATION,
+            'date'            => $date->toDateString(),
+            'slotDuration'    => DoctorSlotService::SLOT_DURATION,
             'slots'           => $slots,
-        ]);
-    }
+        ];
 
-    private function generateSlots(Carbon $date, string $startTime, string $endTime): array
-    {
-        $slots    = [];
-        
-        $startParts = explode(':', $startTime);
-        $endParts = explode(':', $endTime);
-        
-        $current  = $date->copy()->setTime((int)$startParts[0], (int)$startParts[1]);
-        $end      = $date->copy()->setTime((int)$endParts[0], (int)$endParts[1]);
-
-        while ($current < $end) {
-            $slots[] = $current->format('H:i');
-            $current->addMinutes(self::SLOT_DURATION);
+        if (empty($slots)) {
+            $payload['note'] = 'Doctor is not available on this day.';
         }
 
-        return $slots;
+        return response()->json($payload);
     }
 
     // --- Doctor endpoints ---

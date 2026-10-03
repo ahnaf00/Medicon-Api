@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\MedicineController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PrescriptionController;
+use App\Http\Controllers\Api\SymptomSearchController;
 use App\Http\Controllers\Api\VitalController;
 use App\Http\Controllers\Api\DoctorDashboardController;
 use Illuminate\Support\Facades\Route;
@@ -93,6 +94,10 @@ Route::prefix('v1')->group(function () {
 
         // --- AI Symptom Triage (stricter rate limit) ---
         Route::post('/ai/triage', [AiTriageController::class, 'store'])
+            ->middleware('throttle:ai');
+
+        // --- Symptom search: triage + ranked doctors ---
+        Route::post('/symptom-search', [SymptomSearchController::class, 'search'])
             ->middleware('throttle:ai');
 
         // --- Medical Records Domain ---
