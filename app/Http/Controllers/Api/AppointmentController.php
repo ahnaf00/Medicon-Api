@@ -6,10 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Appointments\StoreAppointmentRequest;
 use App\Http\Resources\AppointmentResource;
 use App\Models\Appointment;
+use App\Models\User;
+use App\Services\DoctorSlotService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class AppointmentController extends Controller
 {
@@ -32,18 +37,40 @@ class AppointmentController extends Controller
 
     }
 
-    public function store(StoreAppointmentRequest $request):JsonResponse
+    public function store(StoreAppointmentRequest $request, DoctorSlotService $slots):JsonResponse
     {
         $validated = $request->validated();
 
-         $appointment = Appointment::create([
-            'patient_user_id'       => $request->user()->id,
-            'doctor_user_id'        => $validated['doctor_user_id'],
-            'appointment_datetime'  => $validated['appointment_datetime'],
-            'format'                => $validated['format'],
-            'notes'                 => $validated['notes'] ?? null,
-            'status'                => 'scheduled',
-        ]);
+        // An offset in the value wins; a bare "Y-m-d H:i:s" is clinic (Dhaka) time. Stored as UTC.
+        $start = Carbon::parse($validated['appointment_datetime'], DoctorSlotService::timezone())->utc();
+
+        if (! $start->isFuture()) {
+            throw ValidationException::withMessages([
+                'appointment_datetime' => 'Appointments must be scheduled for a future time.',
+            ]);
+        }
+
+        $doctorId = (int) $validated['doctor_user_id'];
+
+        // Lock the doctor's row so two patients can't take the same slot at once.
+        $appointment = DB::transaction(function () use ($request, $validated, $doctorId, $start, $slots) {
+            $doctor = User::role('doctor')->whereKey($doctorId)->lockForUpdate()->first();
+
+            if (! $doctor || ! $slots->isBookable($doctorId, $start)) {
+                throw ValidationException::withMessages([
+                    'appointment_datetime' => 'That time is not an available slot for this doctor.',
+                ]);
+            }
+
+            return Appointment::create([
+                'patient_user_id'       => $request->user()->id,
+                'doctor_user_id'        => $doctorId,
+                'appointment_datetime'  => $start,
+                'format'                => $validated['format'],
+                'notes'                 => $validated['notes'] ?? null,
+                'status'                => 'scheduled',
+            ]);
+        });
 
         return response()->json([
             'message'       => 'Appointment booked successfully.',

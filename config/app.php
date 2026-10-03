@@ -68,6 +68,14 @@ return [
     'timezone' => 'UTC',
 
     /*
+    | The wall-clock timezone doctors' working hours and schedule exceptions
+    | are written in. Slots are built in this zone, then stored and returned
+    | in UTC.
+    */
+
+    'clinic_timezone' => env('CLINIC_TIMEZONE', 'Asia/Dhaka'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------

@@ -42,8 +42,8 @@ beforeEach(function () {
     config(['services.gemini.api_key' => 'test-key']);
     Http::preventStrayRequests();
 
-    // Monday 08:00 UTC; with no availability configured a doctor works 09:00–17:00.
-    $this->travelTo('2026-10-05 08:00:00');
+    // Monday 08:00 Dhaka (02:00 UTC); with no availability configured a doctor works 09:00–17:00 Dhaka.
+    $this->travelTo('2026-10-05 02:00:00');
     $this->patient = makePatient();
 });
 
@@ -170,7 +170,7 @@ describe('ranking', function () {
             ->assertOk()
             ->assertJsonCount(2, 'doctors')
             ->assertJsonPath('doctors.0.id', $soon->id)
-            ->assertJsonPath('doctors.0.doctorProfile.nextAvailableAt', '2026-10-05T09:00:00+00:00')
+            ->assertJsonPath('doctors.0.doctorProfile.nextAvailableAt', '2026-10-05T03:00:00+00:00')
             ->assertJsonPath('doctors.0.doctorProfile.completedConsultations', 0)
             ->assertJsonPath('doctors.1.id', $busy->id)
             ->assertJsonPath('doctors.1.doctorProfile.nextAvailableAt', null)
@@ -178,13 +178,13 @@ describe('ranking', function () {
     });
 
     it('skips booked and already-passed slots when finding the next free time', function () {
-        $this->travelTo('2026-10-05 09:10:00');
+        $this->travelTo('2026-10-05 03:10:00'); // 09:10 Dhaka
         $doctor = rankedDoctor('Cardiology', 4.5, 10);
-        bookAppointment($this->patient, $doctor)->update(['appointment_datetime' => '2026-10-05 09:30:00']);
+        bookAppointment($this->patient, $doctor)->update(['appointment_datetime' => '2026-10-05 03:30:00']); // 09:30 Dhaka
 
         searchSymptoms('heart racing')
             ->assertOk()
-            ->assertJsonPath('doctors.0.doctorProfile.nextAvailableAt', '2026-10-05T10:00:00+00:00');
+            ->assertJsonPath('doctors.0.doctorProfile.nextAvailableAt', '2026-10-05T04:00:00+00:00');
     });
 
     it('breaks ties by doctor id so the order is stable', function () {
@@ -227,14 +227,14 @@ describe('ranking', function () {
 describe('slots endpoint (shared slot logic)', function () {
     it('still lists the day\'s slots and marks booked ones', function () {
         $doctor = rankedDoctor('Cardiology', 4.0, 5);
-        bookAppointment($this->patient, $doctor)->update(['appointment_datetime' => '2026-10-05 09:30:00']);
+        bookAppointment($this->patient, $doctor)->update(['appointment_datetime' => '2026-10-05 03:30:00']); // 09:30 Dhaka
 
         $this->getJson("/api/v1/doctors/{$doctor->id}/slots?date=2026-10-05")
             ->assertOk()
             ->assertJsonPath('date', '2026-10-05')
             ->assertJsonPath('slotDuration', 30)
             ->assertJsonCount(16, 'slots')
-            ->assertJsonPath('slots.0', ['time' => '09:00', 'datetime' => '2026-10-05T09:00:00+00:00', 'available' => true])
+            ->assertJsonPath('slots.0', ['time' => '09:00', 'datetime' => '2026-10-05T03:00:00+00:00', 'available' => true])
             ->assertJsonPath('slots.1.available', false)
             ->assertJsonMissingPath('note');
     });

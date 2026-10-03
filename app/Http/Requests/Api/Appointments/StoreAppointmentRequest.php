@@ -17,7 +17,9 @@ class StoreAppointmentRequest extends FormRequest
     {
         return [
             'doctor_user_id'        => ['required', 'exists:users,id'],
-            'appointment_datetime'  => ['required', 'date', 'after:now'],
+            // ISO-8601 with an offset (e.g. a slot's `datetime`); a value without an
+            // offset is read as clinic time (Asia/Dhaka). Future/slot checks are in the controller.
+            'appointment_datetime'  => ['required', 'date'],
             'format'                => ['required', 'in:video,in_person'],
             'notes'                 => ['nullable', 'string', 'max:1000'],
         ];
@@ -27,7 +29,6 @@ class StoreAppointmentRequest extends FormRequest
     {
         return [
             'doctor_user_id.exists'         => 'The selected doctor does not exist.',
-            'appointment_datetime.after'    => 'Appointments must be scheduled for a future time.',
         ];
     }
 }

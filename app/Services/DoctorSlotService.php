@@ -6,52 +6,87 @@ use App\Models\Appointment;
 use App\Models\DoctorAvailability;
 use App\Models\DoctorScheduleException;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 /**
  * Builds a doctor's bookable slots from their weekly availability, daily
  * exceptions and existing appointments.
  *
- * Shared by the public slots endpoint and the symptom-search ranking, so the
- * "next available" time patients see always matches what they can book.
+ * Shared by the public slots endpoint, booking and the symptom-search ranking,
+ * so the "next available" time patients see always matches what they can book.
+ *
+ * Working hours and exceptions are wall-clock times in the clinic timezone
+ * (Asia/Dhaka). Appointments are stored in UTC. Every slot carries its Dhaka
+ * label (`time`) and its UTC instant (`datetime`, ISO-8601 with offset).
  */
 class DoctorSlotService
 {
     public const SLOT_DURATION = 30; // minutes
 
     /** Appointment statuses that occupy a slot. */
-    private const BOOKED_STATUSES = ['scheduled', 'completed', 'in-progress'];
+    private const BOOKED_STATUSES = ['scheduled', 'completed', 'in_progress'];
 
     // Used when a doctor has no availability configured for a weekday.
     private const DEFAULT_START = '09:00:00';
     private const DEFAULT_END = '17:00:00';
     private const DEFAULT_OFF_DAYS = [5, 6]; // Fri, Sat
 
+    public static function timezone(): string
+    {
+        return config('app.clinic_timezone', 'Asia/Dhaka');
+    }
+
+    /** Today's date in the clinic timezone, at midnight. */
+    public static function today(): Carbon
+    {
+        return now(self::timezone())->startOfDay();
+    }
+
     /**
-     * All slots for one doctor on one date.
+     * All slots for one doctor on one clinic-timezone calendar date (Y-m-d).
      *
      * @return array<int, array{time: string, datetime: string, available: bool}>
      */
-    public function slotsOn(int $doctorId, Carbon $date): array
+    public function slotsOn(int $doctorId, string $date): array
     {
-        $dateString = $date->toDateString();
+        $day = Carbon::parse($date, self::timezone())->startOfDay();
 
         $availability = DoctorAvailability::where('doctor_user_id', $doctorId)
-            ->where('day_of_week', $date->dayOfWeek)
+            ->where('day_of_week', $day->dayOfWeek)
             ->first();
 
         $exceptions = DoctorScheduleException::where('doctor_user_id', $doctorId)
-            ->whereDate('date', $dateString)
+            ->whereDate('date', $day->toDateString())
             ->get();
 
         $bookedTimes = Appointment::where('doctor_user_id', $doctorId)
-            ->whereDate('appointment_datetime', $dateString)
+            ->whereBetween('appointment_datetime', $this->utcRange($day, $day))
             ->whereIn('status', self::BOOKED_STATUSES)
             ->pluck('appointment_datetime')
-            ->map(fn ($dt) => Carbon::parse($dt)->format('H:i'))
+            ->map(fn ($dt) => $this->localTime($dt))
             ->all();
 
-        return $this->buildSlots($date, $availability, $exceptions, $bookedTimes);
+        return $this->buildSlots($day, $availability, $exceptions, $bookedTimes);
+    }
+
+    /**
+     * Whether `$start` is exactly the start of a free slot for this doctor.
+     */
+    public function isBookable(int $doctorId, CarbonInterface $start): bool
+    {
+        $local = $start->copy()->setTimezone(self::timezone());
+        if ($local->second !== 0) {
+            return false;
+        }
+
+        foreach ($this->slotsOn($doctorId, $local->toDateString()) as $slot) {
+            if ($slot['time'] === $local->format('H:i')) {
+                return $slot['available'];
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -59,7 +94,7 @@ class DoctorSlotService
      * Loads availability, exceptions and appointments for all doctors in three queries.
      *
      * @param  array<int, int>  $doctorIds
-     * @return array<int, Carbon|null> keyed by doctor user id
+     * @return array<int, Carbon|null> keyed by doctor user id, in UTC
      */
     public function nextAvailable(array $doctorIds, int $days = 14): array
     {
@@ -68,8 +103,8 @@ class DoctorSlotService
         }
 
         $now = now();
-        $from = $now->copy()->startOfDay();
-        $to = $from->copy()->addDays($days - 1)->endOfDay();
+        $from = self::today();
+        $to = $from->copy()->addDays($days - 1);
 
         $availabilities = DoctorAvailability::whereIn('doctor_user_id', $doctorIds)
             ->get()
@@ -81,11 +116,11 @@ class DoctorSlotService
             ->groupBy(fn ($ex) => $ex->doctor_user_id.'|'.Carbon::parse($ex->date)->toDateString());
 
         $booked = Appointment::whereIn('doctor_user_id', $doctorIds)
-            ->whereBetween('appointment_datetime', [$from, $to])
+            ->whereBetween('appointment_datetime', $this->utcRange($from, $to))
             ->whereIn('status', self::BOOKED_STATUSES)
             ->get(['doctor_user_id', 'appointment_datetime'])
-            ->groupBy(fn ($a) => $a->doctor_user_id.'|'.$a->appointment_datetime->toDateString())
-            ->map(fn ($group) => $group->map(fn ($a) => $a->appointment_datetime->format('H:i'))->all());
+            ->groupBy(fn ($a) => $a->doctor_user_id.'|'.$a->appointment_datetime->copy()->setTimezone(self::timezone())->toDateString())
+            ->map(fn ($group) => $group->map(fn ($a) => $this->localTime($a->appointment_datetime))->all());
 
         $next = [];
         foreach ($doctorIds as $doctorId) {
@@ -103,7 +138,7 @@ class DoctorSlotService
                 );
 
                 foreach ($slots as $slot) {
-                    $start = Carbon::parse($slot['datetime']);
+                    $start = Carbon::parse($slot['datetime'])->utc();
                     if ($slot['available'] && $start->greaterThan($now)) {
                         $next[$doctorId] = $start;
                         break 2;
@@ -116,8 +151,28 @@ class DoctorSlotService
     }
 
     /**
+     * UTC bounds covering whole clinic-timezone days, for querying stored appointments.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function utcRange(Carbon $fromDay, Carbon $toDay): array
+    {
+        return [
+            $fromDay->copy()->startOfDay()->utc(),
+            $toDay->copy()->endOfDay()->utc(),
+        ];
+    }
+
+    /** A stored (UTC) appointment time as a clinic-timezone H:i label. */
+    private function localTime(mixed $datetime): string
+    {
+        return Carbon::parse($datetime, 'UTC')->setTimezone(self::timezone())->format('H:i');
+    }
+
+    /**
+     * @param  Carbon  $date  midnight of the day, in the clinic timezone
      * @param  Collection<int, DoctorScheduleException>  $exceptions
-     * @param  array<int, string>  $bookedTimes  H:i
+     * @param  array<int, string>  $bookedTimes  H:i in the clinic timezone
      * @return array<int, array{time: string, datetime: string, available: bool}>
      */
     private function buildSlots(Carbon $date, ?DoctorAvailability $availability, Collection $exceptions, array $bookedTimes): array
@@ -146,7 +201,7 @@ class DoctorSlotService
 
         $finalRawSlots = array_values(array_filter($rawSlots, fn ($timeStr) => ! in_array($timeStr, $disabledTimes)));
 
-        usort($finalRawSlots, fn ($a, $b) => strtotime($a) - strtotime($b));
+        usort($finalRawSlots, fn ($a, $b) => strcmp($a, $b));
 
         $slots = [];
         foreach ($finalRawSlots as $timeStr) {
@@ -155,7 +210,7 @@ class DoctorSlotService
 
             $slots[] = [
                 'time' => $timeStr,
-                'datetime' => $dt->toIso8601String(),
+                'datetime' => $dt->utc()->toIso8601String(),
                 'available' => ! in_array($timeStr, $bookedTimes),
             ];
         }

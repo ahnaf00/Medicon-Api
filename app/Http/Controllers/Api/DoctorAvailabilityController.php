@@ -10,21 +10,30 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class DoctorAvailabilityController extends Controller
 {
     public function slots(Request $request, int $id, DoctorSlotService $slotService): JsonResponse
     {
         $request->validate([
-            'date' => ['required', 'date', 'after_or_equal:today', 'before:+30 days'],
+            'date' => ['required', 'date'],
         ]);
+
+        // The date is a clinic-timezone (Asia/Dhaka) calendar day, so "today" is Dhaka's today.
+        $today = DoctorSlotService::today();
+        $date = Carbon::parse($request->query('date'), DoctorSlotService::timezone())->startOfDay();
+        if ($date->lt($today) || $date->gte($today->copy()->addDays(30))) {
+            throw ValidationException::withMessages([
+                'date' => 'The date must be between today and 30 days from now.',
+            ]);
+        }
 
         $doctor = User::role('doctor')
             ->with('doctorProfile')
             ->findOrFail($id);
 
-        $date = Carbon::parse($request->query('date'));
-        $slots = $slotService->slotsOn($id, $date);
+        $slots = $slotService->slotsOn($id, $date->toDateString());
 
         $payload = [
             'doctorId'        => $id,
