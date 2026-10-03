@@ -113,8 +113,11 @@ Route::prefix('v1')->group(function () {
         // --- Conversations / Q&A Domain ---
         Route::get('/conversations', [ConversationController::class, 'index']);
         Route::post('/conversations', [ConversationController::class, 'store']);
+        Route::patch('/conversations/{id}', [ConversationController::class, 'update']);
+        Route::delete('/conversations/{id}', [ConversationController::class, 'destroy']);
         Route::get('/conversations/{id}/messages', [ConversationController::class, 'messages']);
         Route::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage']);
+        Route::patch('/conversations/{id}/messages/{messageId}', [ConversationController::class, 'updateMessage']);
 
         // --- AI Chat Domain ---
         Route::middleware('throttle:ai')->group(function () {

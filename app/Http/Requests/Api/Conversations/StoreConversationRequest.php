@@ -20,6 +20,7 @@ class StoreConversationRequest extends FormRequest
             'doctor_user_id' => ['nullable', 'exists:users,id'],
             'subject'        => ['nullable', 'string', 'max:255'],
             'department'     => ['required', 'string', 'max:255'],
+            'is_anonymous'   => ['sometimes', 'boolean'],
         ];
     }
 }
