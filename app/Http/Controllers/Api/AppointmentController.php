@@ -137,6 +137,12 @@ class AppointmentController extends Controller
 
         Gate::authorize('cancel', $appointment);
 
+        if ($appointment->status !== 'scheduled') {
+            throw ValidationException::withMessages([
+                'status' => 'Only a scheduled appointment can be cancelled.',
+            ]);
+        }
+
         $appointment->update(['status' => 'cancelled']);
 
         return response()->json([

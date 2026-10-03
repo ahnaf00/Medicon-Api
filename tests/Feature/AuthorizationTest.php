@@ -89,4 +89,16 @@ describe('appointment cancellation', function () {
 
         expect($appointment->fresh()->status)->toBe('scheduled');
     });
+
+    it('refuses to cancel a visit that is no longer scheduled', function (string $status) {
+        $patient = makePatient();
+        $appointment = bookAppointment($patient, makeDoctor());
+        $appointment->update(['status' => $status]);
+
+        $this->actingAs($patient, 'sanctum')
+            ->patchJson("/api/v1/appointments/{$appointment->id}/cancel")
+            ->assertUnprocessable();
+
+        expect($appointment->fresh()->status)->toBe($status);
+    })->with(['in_progress', 'completed', 'no_show', 'cancelled']);
 });
