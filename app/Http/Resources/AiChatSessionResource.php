@@ -17,6 +17,7 @@ class AiChatSessionResource extends JsonResource
         return [
             'id'            => $this->id,
             'title'         => $this->title,
+            'appointmentId' => $this->appointment_id,
             'latestMessage' => new AiChatMessageResource($this->whenLoaded('latestMessage')),
             'createdAt'     => $this->created_at?->toIso8601String(),
         ];

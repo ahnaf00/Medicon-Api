@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Consultations\UpsertConsultationSummaryRequest;
 use App\Http\Resources\ConsultationSummaryResource;
+use App\Models\AiChatSession;
 use App\Models\Appointment;
 use App\Models\ConsultationSummary;
 use Illuminate\Http\JsonResponse;
@@ -26,7 +27,12 @@ class ConsultationController extends Controller
 
         Gate::authorize('viewSummary', $appointment);
 
-        return response()->json($this->payload($appointment));
+        return response()->json($this->payload($appointment) + [
+            // The patient's existing consultation chat, so the app can load its history.
+            'chatSessionId' => AiChatSession::where('user_id', $request->user()->id)
+                ->where('appointment_id', $appointment->id)
+                ->value('id'),
+        ]);
     }
 
     public function upsert(UpsertConsultationSummaryRequest $request, $appointmentId): JsonResponse

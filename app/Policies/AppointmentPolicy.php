@@ -34,6 +34,12 @@ class AppointmentPolicy
         return $user->id === (int) $appointment->doctor_user_id;
     }
 
+    /** The consultation chat is the patient's: only that appointment's patient may use it. */
+    public function consultationChat(User $user, Appointment $appointment): bool
+    {
+        return $user->id === (int) $appointment->patient_user_id;
+    }
+
     private function isParticipant(User $user, Appointment $appointment): bool
     {
         return $user->id === (int) $appointment->patient_user_id

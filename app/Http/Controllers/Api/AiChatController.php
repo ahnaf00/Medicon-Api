@@ -20,9 +20,10 @@ class AiChatController extends Controller
 
         $user = $request->user();
 
-        // Get or create session
+        // Get or create session. Consultation sessions are only continued through
+        // /ai/consultation-chat, which grounds every answer in that consultation.
         $session = $request->session_id
-            ? AiChatSession::where('id', $request->session_id)->where('user_id', $user->id)->firstOrFail()
+            ? AiChatSession::where('id', $request->session_id)->where('user_id', $user->id)->whereNull('appointment_id')->firstOrFail()
             : AiChatSession::create(['user_id' => $user->id, 'title' => substr($request->message, 0, 60)]);
 
         // Store user message

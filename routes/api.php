@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AiChatController;
 use App\Http\Controllers\Api\AiTriageController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ConsultationChatController;
 use App\Http\Controllers\Api\ConsultationController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DoctorAvailabilityController;
@@ -120,6 +121,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/ai/chat', [AiChatController::class, 'chat']);
             Route::get('/ai/sessions', [AiChatController::class, 'sessions']);
             Route::get('/ai/sessions/{id}/messages', [AiChatController::class, 'messages']);
+            Route::post('/ai/consultation-chat', [ConsultationChatController::class, 'chat']);
         });
 
         // --- Medicine / Drug Domain ---
