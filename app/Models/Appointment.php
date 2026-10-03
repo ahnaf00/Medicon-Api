@@ -16,6 +16,8 @@ class Appointment extends Model
         'doctor_user_id',
         'appointment_datetime',
         'duration_minutes',
+        'started_at',
+        'ended_at',
         'format',
         'status',
         'notes',
@@ -23,6 +25,8 @@ class Appointment extends Model
 
      protected $casts = [
         'appointment_datetime' => 'datetime',
+        'started_at' => 'datetime',
+        'ended_at' => 'datetime',
     ];
 
     public function patient():BelongsTo

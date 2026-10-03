@@ -78,6 +78,57 @@ class AppointmentController extends Controller
         ], 201);
     }
 
+    /** Allowed status moves: from => [to, ...]. */
+    private const STATUS_TRANSITIONS = [
+        'scheduled'   => ['in_progress', 'no_show'],
+        'in_progress' => ['completed'],
+    ];
+
+    /**
+     * Doctor moves a visit through its lifecycle. Starting stamps `started_at`;
+     * completing stamps `ended_at` and writes `duration_minutes`.
+     */
+    public function updateStatus(Request $request, $id):JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'in:in_progress,completed,no_show'],
+        ]);
+
+        $appointment = Appointment::findOrFail($id);
+
+        Gate::authorize('updateStatus', $appointment);
+
+        $to = $validated['status'];
+        $allowed = self::STATUS_TRANSITIONS[$appointment->status] ?? [];
+
+        if (! in_array($to, $allowed, true)) {
+            return response()->json([
+                'message' => "An appointment that is {$appointment->status} cannot be marked {$to}.",
+            ], 409);
+        }
+
+        $changes = ['status' => $to];
+
+        if ($to === 'in_progress') {
+            $changes['started_at'] = now();
+        }
+
+        if ($to === 'completed') {
+            $endedAt = now();
+            $changes['ended_at'] = $endedAt;
+            $changes['duration_minutes'] = $appointment->started_at
+                ? max(1, (int) round($appointment->started_at->diffInMinutes($endedAt, true)))
+                : null;
+        }
+
+        $appointment->update($changes);
+
+        return response()->json([
+            'message' => 'Appointment status updated.',
+            'appointment' => new AppointmentResource($appointment->load(['doctor.doctorProfile', 'patient.patientProfile'])),
+        ]);
+    }
+
     public function cancel(Request $request, $id):JsonResponse
     {
         $appointment = Appointment::findOrFail($id);

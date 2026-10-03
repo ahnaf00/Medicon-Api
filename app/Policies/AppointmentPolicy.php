@@ -17,6 +17,12 @@ class AppointmentPolicy
         return $this->isParticipant($user, $appointment);
     }
 
+    /** Only the appointment's own doctor moves it through the visit lifecycle. */
+    public function updateStatus(User $user, Appointment $appointment): bool
+    {
+        return $user->id === (int) $appointment->doctor_user_id;
+    }
+
     private function isParticipant(User $user, Appointment $appointment): bool
     {
         return $user->id === (int) $appointment->patient_user_id

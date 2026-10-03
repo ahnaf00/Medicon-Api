@@ -21,6 +21,8 @@ class AppointmentResource extends JsonResource
             'status'          => $this->status,
             'notes'           => $this->notes,
             'durationMinutes' => $this->duration_minutes,
+            'startedAt'       => $this->started_at?->toIso8601String(),
+            'endedAt'         => $this->ended_at?->toIso8601String(),
             'doctor'          => new UserResource($this->whenLoaded('doctor')),
             'patient'         => new UserResource($this->whenLoaded('patient')),
             'createdAt'       => $this->created_at?->toIso8601String(),

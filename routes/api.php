@@ -72,6 +72,7 @@ Route::prefix('v1')->group(function () {
         // --- Doctor-Restricted Routes ---
         Route::middleware(['role:doctor', 'doctor.verified'])->group(function () {
             Route::get('/doctor/dashboard', [DoctorDashboardController::class, 'index']);
+            Route::patch('/appointments/{id}/status', [AppointmentController::class, 'updateStatus']);
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
             Route::get('/patients', [PatientController::class, 'index']);
             Route::get('/patients/{id}', [PatientController::class, 'show']);
