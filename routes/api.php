@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\SymptomSearchController;
 use App\Http\Controllers\Api\VitalController;
 use App\Http\Controllers\Api\DoctorDashboardController;
+use App\Http\Controllers\Api\DoctorPresenceController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -75,6 +76,8 @@ Route::prefix('v1')->group(function () {
         // --- Doctor-Restricted Routes ---
         Route::middleware(['role:doctor', 'doctor.verified'])->group(function () {
             Route::get('/doctor/dashboard', [DoctorDashboardController::class, 'index']);
+            Route::get('/doctor/presence', [DoctorPresenceController::class, 'show']);
+            Route::post('/doctor/presence', [DoctorPresenceController::class, 'update']);
             Route::patch('/appointments/{id}/status', [AppointmentController::class, 'updateStatus']);
             Route::put('/consultations/{appointmentId}/summary', [ConsultationController::class, 'upsert']);
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);

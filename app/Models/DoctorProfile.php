@@ -22,8 +22,12 @@ class DoctorProfile extends Model
         'rating',
         'bio',
         'verification_status',
+        'is_online',
+        'last_seen_at',
     ];
     protected $casts = [
+        'is_online' => 'boolean',
+        'last_seen_at' => 'datetime',
         'experience_years' => 'integer',
         'consultation_fee' => 'decimal:2',
         'rating' => 'decimal:2',
