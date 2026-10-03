@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\MedicalRecords\StoreMedicalRecordRequest;
 use App\Http\Resources\MedicalRecordResource;
+use App\Jobs\AnalyzeReportJob;
 use App\Models\MedicalRecord;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,6 +74,32 @@ class MedicalRecordController extends Controller
         Gate::authorize('view', $record);
 
         return response()->json(['record' => new MedicalRecordResource($record)]);
+    }
+
+    public function analyze(Request $request, $id): JsonResponse
+    {
+        $record = MedicalRecord::findOrFail($id);
+
+        Gate::authorize('analyze', $record);
+
+        // Don't queue a second run while one is in flight, unless it has been stuck for a while.
+        $inFlight = $record->analysis_status === 'processing'
+            && $record->updated_at?->gt(now()->subMinutes(5));
+
+        if (! $inFlight) {
+            $record->forceFill([
+                'analysis_status' => 'processing',
+                'analysis_error'  => null,
+                'updated_at'      => now(),
+            ])->save();
+
+            AnalyzeReportJob::dispatch($record);
+        }
+
+        return response()->json([
+            'message' => 'Report analysis started.',
+            'record'  => new MedicalRecordResource($record->fresh(['pages', 'labResults'])),
+        ], 202);
     }
 
     public function destroy(Request $request, $id): JsonResponse

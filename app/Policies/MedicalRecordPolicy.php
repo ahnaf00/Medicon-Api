@@ -12,6 +12,11 @@ class MedicalRecordPolicy
         return $user->id === (int) $record->patient_user_id;
     }
 
+    public function analyze(User $user, MedicalRecord $record): bool
+    {
+        return $user->id === (int) $record->patient_user_id;
+    }
+
     public function delete(User $user, MedicalRecord $record): bool
     {
         return $user->id === (int) $record->patient_user_id;

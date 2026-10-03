@@ -97,6 +97,8 @@ Route::prefix('v1')->group(function () {
 
         // --- Medical Records Domain ---
         Route::apiResource('medical-records', MedicalRecordController::class)->except(['update']);
+        Route::post('/medical-records/{id}/analyze', [MedicalRecordController::class, 'analyze'])
+            ->middleware('throttle:ai');
 
         // --- Conversations / Q&A Domain ---
         Route::get('/conversations', [ConversationController::class, 'index']);
