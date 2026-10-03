@@ -23,6 +23,11 @@ class AppointmentResource extends JsonResource
             'durationMinutes' => $this->duration_minutes,
             'startedAt'       => $this->started_at?->toIso8601String(),
             'endedAt'         => $this->ended_at?->toIso8601String(),
+            // Only present where the list query loads it (GET /appointments).
+            'hasSummary'      => $this->when(
+                array_key_exists('consultation_summary_exists', $this->resource?->getAttributes() ?? []),
+                fn () => (bool) $this->consultation_summary_exists,
+            ),
             'doctor'          => new UserResource($this->whenLoaded('doctor')),
             'patient'         => new UserResource($this->whenLoaded('patient')),
             'createdAt'       => $this->created_at?->toIso8601String(),

@@ -22,7 +22,9 @@ class AppointmentController extends Controller
     {
         $user = $request->user();
 
-        $appointments = Appointment::with(['doctor.doctorProfile', 'patient.patientProfile'])->orderBy('appointment_datetime','asc');
+        $appointments = Appointment::with(['doctor.doctorProfile', 'patient.patientProfile'])
+            ->withExists('consultationSummary')
+            ->orderBy('appointment_datetime','asc');
 
         if($user->hasRole('doctor'))
         {

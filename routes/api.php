@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AiChatController;
 use App\Http\Controllers\Api\AiTriageController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ConsultationController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DoctorAvailabilityController;
 use App\Http\Controllers\Api\DoctorController;
@@ -63,6 +64,7 @@ Route::prefix('v1')->group(function () {
         // --- Appointments Domain ---
         Route::get('/appointments', [AppointmentController::class, 'index']);
         Route::patch('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
+        Route::get('/consultations/{appointmentId}/summary', [ConsultationController::class, 'show']);
 
         // --- Patient-Restricted Routes ---
         Route::middleware('role:patient')->group(function () {
@@ -73,6 +75,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['role:doctor', 'doctor.verified'])->group(function () {
             Route::get('/doctor/dashboard', [DoctorDashboardController::class, 'index']);
             Route::patch('/appointments/{id}/status', [AppointmentController::class, 'updateStatus']);
+            Route::put('/consultations/{appointmentId}/summary', [ConsultationController::class, 'upsert']);
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
             Route::get('/patients', [PatientController::class, 'index']);
             Route::get('/patients/{id}', [PatientController::class, 'show']);

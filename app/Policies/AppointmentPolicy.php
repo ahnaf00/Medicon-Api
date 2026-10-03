@@ -23,6 +23,17 @@ class AppointmentPolicy
         return $user->id === (int) $appointment->doctor_user_id;
     }
 
+    public function viewSummary(User $user, Appointment $appointment): bool
+    {
+        return $this->isParticipant($user, $appointment);
+    }
+
+    /** The summary is the doctor's clinical note: only that appointment's doctor writes it. */
+    public function writeSummary(User $user, Appointment $appointment): bool
+    {
+        return $user->id === (int) $appointment->doctor_user_id;
+    }
+
     private function isParticipant(User $user, Appointment $appointment): bool
     {
         return $user->id === (int) $appointment->patient_user_id
