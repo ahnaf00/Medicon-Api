@@ -2,27 +2,22 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class PrescriptionItem extends Model
+class PrescriptionTest extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'prescription_id',
-        'medicine_name',
-        'dosage',
-        'dosage_schedule',
+        'name',
         'instructions',
-        'duration_days',
-        'explanation',
+        'order',
     ];
+
     protected $casts = [
-        'dosage_schedule' => 'array', // Automatically casts JSON string to PHP array
-        'duration_days' => 'integer',
+        'order' => 'integer',
     ];
+
     public function prescription(): BelongsTo
     {
         return $this->belongsTo(Prescription::class, 'prescription_id');

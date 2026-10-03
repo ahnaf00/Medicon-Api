@@ -16,7 +16,13 @@ class Prescription extends Model
         'patient_user_id',
         'doctor_user_id',
         'diagnosis_summary',
+        'follow_up_date',
+        'advice',
         'status',
+    ];
+
+    protected $casts = [
+        'follow_up_date' => 'date',
     ];
 
     public function appointment():BelongsTo
@@ -37,5 +43,10 @@ class Prescription extends Model
     public function items():HasMany
     {
         return $this->hasMany(PrescriptionItem::class,'prescription_id');
+    }
+
+    public function tests():HasMany
+    {
+        return $this->hasMany(PrescriptionTest::class,'prescription_id')->orderBy('order');
     }
 }

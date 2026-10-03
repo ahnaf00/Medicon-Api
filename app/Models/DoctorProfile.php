@@ -13,6 +13,8 @@ class DoctorProfile extends Model
         'user_id',
         'specialty',
         'qualification',
+        'bmdc_registration_no',
+        'hospital_name',
         'experience_years',
         'consultation_fee',
         'follow_up_fee',
