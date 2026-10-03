@@ -48,6 +48,8 @@ class PrescriptionController extends Controller
                 'patient_user_id'       => $validated['patient_user_id'],
                 'doctor_user_id'        => $doctor->id,
                 'diagnosis_summary'     => $validated['diagnosis_summary'],
+                'follow_up_date'        => $validated['follow_up_date'] ?? null,
+                'advice'                => $validated['advice'] ?? null,
                 'status'                => 'active',
             ]);
             foreach ($validated['medicines'] as $med) {
@@ -59,11 +61,18 @@ class PrescriptionController extends Controller
                     'duration_days'     => $med['duration_days'],
                 ]);
             }
+            foreach ($validated['tests'] ?? [] as $order => $test) {
+                $prescription->tests()->create([
+                    'name'              => $test['name'],
+                    'instructions'      => $test['instructions'] ?? null,
+                    'order'             => $order,
+                ]);
+            }
             return $prescription;
         });
         return response()->json([
             'message'       => 'Prescription issued successfully.',
-            'prescription'  => $prescription->load('items'),
+            'prescription'  => $prescription->load(['items', 'tests']),
         ], 201);
     }
 

@@ -22,6 +22,11 @@ class StorePrescriptionRequest extends FormRequest
             'medicines.*.dosage_schedule'   => ['nullable', 'array'],
             'medicines.*.instructions'      => ['nullable', 'string', 'max:255'],
             'medicines.*.duration_days'     => ['required', 'integer', 'min:1'],
+            'tests'                         => ['nullable', 'array'],
+            'tests.*.name'                  => ['required', 'string', 'max:255'],
+            'tests.*.instructions'          => ['nullable', 'string', 'max:255'],
+            'follow_up_date'                => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
+            'advice'                        => ['nullable', 'string', 'max:2000'],
         ];
     }
 }
