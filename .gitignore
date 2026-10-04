@@ -27,3 +27,11 @@ Homestead.yaml
 Thumbs.db
 .agents
 audit_report.txt
+
+# Transcriber agent (Phase 6.5): local venv, secrets, and consultation audio
+/tools/transcriber/.venv/
+/tools/transcriber/.env
+/tools/transcriber/storage/
+/tools/transcriber/dev-out/
+/tools/transcriber/**/__pycache__/
+/tools/transcriber/.pytest_cache/

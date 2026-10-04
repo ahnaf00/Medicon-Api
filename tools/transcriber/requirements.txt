@@ -1,0 +1,8 @@
+# Versions verified in the Phase 6.0 spike (Python 3.14, Windows).
+livekit-agents==1.8.4
+livekit==1.1.20
+livekit-api==1.2.1
+soundfile==0.14.0
+numpy==2.5.3
+httpx==0.28.1
+python-dotenv==1.2.4
