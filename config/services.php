@@ -39,4 +39,19 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
     ],
 
+    // Self-hosted LiveKit for in-app video consultations (Phase 6).
+    // `url` is what phones connect to (LAN IP); `http_url` is what Laravel
+    // uses for the server API (RoomService), normally the same host locally.
+    'livekit' => [
+        'url' => env('LIVEKIT_URL'),
+        'http_url' => env('LIVEKIT_HTTP_URL', 'http://127.0.0.1:7880'),
+        'api_key' => env('LIVEKIT_API_KEY'),
+        'api_secret' => env('LIVEKIT_API_SECRET'),
+    ],
+
+    // Shared secret the Python transcriber agent sends as X-Transcriber-Secret.
+    'transcriber' => [
+        'secret' => env('TRANSCRIBER_SECRET'),
+    ],
+
 ];
