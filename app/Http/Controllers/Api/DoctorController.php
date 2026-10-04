@@ -11,14 +11,14 @@ class DoctorController extends Controller
 {
     public function index():AnonymousResourceCollection
     {
-        $doctors = User::role('doctor')->with('doctorProfile')->get();
+        $doctors = User::verifiedDoctors()->with('doctorProfile')->get();
 
         return UserResource::collection($doctors);
     }
 
     public function show(int $id):UserResource
     {
-        $doctor = User::role('doctor')
+        $doctor = User::verifiedDoctors()
                 ->with('doctorProfile')
                 ->findOrFail($id);
 

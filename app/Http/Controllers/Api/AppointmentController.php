@@ -57,7 +57,7 @@ class AppointmentController extends Controller
 
         // Lock the doctor's row so two patients can't take the same slot at once.
         $appointment = DB::transaction(function () use ($request, $validated, $doctorId, $start, $slots) {
-            $doctor = User::role('doctor')->whereKey($doctorId)->lockForUpdate()->first();
+            $doctor = User::verifiedDoctors()->whereKey($doctorId)->lockForUpdate()->first();
 
             if (! $doctor || ! $slots->isBookable($doctorId, $start)) {
                 throw ValidationException::withMessages([

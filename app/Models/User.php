@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -52,6 +53,16 @@ class User extends Authenticatable
     {
         return $this->hasRole('doctor')
             && $this->doctorProfile?->verification_status === 'verified';
+    }
+
+    /**
+     * Doctors patients may browse and book: the doctor role with a verified
+     * profile. A pending doctor can't start a visit, so booking one is a dead end.
+     */
+    public function scopeVerifiedDoctors(Builder $query): Builder
+    {
+        return $query->role('doctor')
+            ->whereHas('doctorProfile', fn (Builder $q) => $q->where('verification_status', 'verified'));
     }
 
     /**

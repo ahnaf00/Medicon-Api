@@ -29,7 +29,7 @@ class DoctorAvailabilityController extends Controller
             ]);
         }
 
-        $doctor = User::role('doctor')
+        $doctor = User::verifiedDoctors()
             ->with('doctorProfile')
             ->findOrFail($id);
 
