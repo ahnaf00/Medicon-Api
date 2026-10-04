@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Appointment;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 class AppointmentPolicy
 {
@@ -38,6 +39,32 @@ class AppointmentPolicy
     public function consultationChat(User $user, Appointment $appointment): bool
     {
         return $user->id === (int) $appointment->patient_user_id;
+    }
+
+    /** Only the two participants join, and only a video appointment has a call (422 otherwise). */
+    public function joinCall(User $user, Appointment $appointment): Response
+    {
+        if (! $this->isParticipant($user, $appointment)) {
+            return Response::deny();
+        }
+
+        return $appointment->format === 'video'
+            ? Response::allow()
+            : Response::denyWithStatus(422, 'This appointment is not a video consultation.');
+    }
+
+    /**
+     * The doctor may always see the transcript. The patient sees it only once the
+     * doctor has reviewed it and saved a transcript-based summary.
+     */
+    public function viewTranscript(User $user, Appointment $appointment): bool
+    {
+        if ($user->id === (int) $appointment->doctor_user_id) {
+            return true;
+        }
+
+        return $user->id === (int) $appointment->patient_user_id
+            && $appointment->consultationSummary()->where('source', 'transcript')->exists();
     }
 
     private function isParticipant(User $user, Appointment $appointment): bool

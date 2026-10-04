@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AiChatController;
 use App\Http\Controllers\Api\AiTriageController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ConsultationCallController;
 use App\Http\Controllers\Api\ConsultationChatController;
 use App\Http\Controllers\Api\ConsultationController;
 use App\Http\Controllers\Api\ConversationController;
@@ -68,6 +69,10 @@ Route::prefix('v1')->group(function () {
         Route::patch('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
         Route::get('/consultations/{appointmentId}/summary', [ConsultationController::class, 'show']);
 
+        // --- Video consultation (both participants; AppointmentPolicy::joinCall) ---
+        Route::post('/appointments/{id}/call/consent', [ConsultationCallController::class, 'consent']);
+        Route::post('/appointments/{id}/call/token', [ConsultationCallController::class, 'token']);
+
         // --- Patient-Restricted Routes ---
         Route::middleware('role:patient')->group(function () {
             Route::post('/appointments', [AppointmentController::class, 'store']);
@@ -80,6 +85,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/doctor/presence', [DoctorPresenceController::class, 'update']);
             Route::post('/doctor/presence/heartbeat', [DoctorPresenceController::class, 'heartbeat']);
             Route::patch('/appointments/{id}/status', [AppointmentController::class, 'updateStatus']);
+            Route::post('/appointments/{id}/call/end', [ConsultationCallController::class, 'end']);
             Route::put('/consultations/{appointmentId}/summary', [ConsultationController::class, 'upsert']);
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
             Route::get('/patients', [PatientController::class, 'index']);

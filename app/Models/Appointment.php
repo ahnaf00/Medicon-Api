@@ -49,6 +49,11 @@ class Appointment extends Model
         return $this->hasOne(ConsultationSummary::class,'appointment_id');
     }
 
+    public function transcript():HasOne
+    {
+        return $this->hasOne(ConsultationTranscript::class,'appointment_id');
+    }
+
     public function billing():HasOne
     {
         return $this->hasOne(Billing::class,'appointment_id');

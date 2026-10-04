@@ -7,6 +7,7 @@ use App\Http\Requests\Api\Appointments\StoreAppointmentRequest;
 use App\Http\Resources\AppointmentResource;
 use App\Models\Appointment;
 use App\Models\User;
+use App\Services\AppointmentLifecycle;
 use App\Services\DoctorSlotService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -80,17 +81,11 @@ class AppointmentController extends Controller
         ], 201);
     }
 
-    /** Allowed status moves: from => [to, ...]. */
-    private const STATUS_TRANSITIONS = [
-        'scheduled'   => ['in_progress', 'no_show'],
-        'in_progress' => ['completed'],
-    ];
-
     /**
      * Doctor moves a visit through its lifecycle. Starting stamps `started_at`;
      * completing stamps `ended_at` and writes `duration_minutes`.
      */
-    public function updateStatus(Request $request, $id):JsonResponse
+    public function updateStatus(Request $request, AppointmentLifecycle $lifecycle, $id):JsonResponse
     {
         $validated = $request->validate([
             'status' => ['required', 'in:in_progress,completed,no_show'],
@@ -101,29 +96,14 @@ class AppointmentController extends Controller
         Gate::authorize('updateStatus', $appointment);
 
         $to = $validated['status'];
-        $allowed = self::STATUS_TRANSITIONS[$appointment->status] ?? [];
 
-        if (! in_array($to, $allowed, true)) {
+        if (! $lifecycle->canTransition($appointment, $to)) {
             return response()->json([
-                'message' => "An appointment that is {$appointment->status} cannot be marked {$to}.",
+                'message' => $lifecycle->rejectionMessage($appointment, $to),
             ], 409);
         }
 
-        $changes = ['status' => $to];
-
-        if ($to === 'in_progress') {
-            $changes['started_at'] = now();
-        }
-
-        if ($to === 'completed') {
-            $endedAt = now();
-            $changes['ended_at'] = $endedAt;
-            $changes['duration_minutes'] = $appointment->started_at
-                ? max(1, (int) round($appointment->started_at->diffInMinutes($endedAt, true)))
-                : null;
-        }
-
-        $appointment->update($changes);
+        $lifecycle->transition($appointment, $to);
 
         return response()->json([
             'message' => 'Appointment status updated.',
