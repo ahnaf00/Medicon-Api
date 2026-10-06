@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\FinalizeConsultationTranscriptJob;
 use App\Models\Appointment;
 use LogicException;
 
@@ -29,8 +30,8 @@ class AppointmentLifecycle
     }
 
     /**
-     * Starting stamps `started_at`; completing stamps `ended_at` and writes
-     * `duration_minutes`.
+     * Starting stamps `started_at`; completing stamps `ended_at`, writes
+     * `duration_minutes` and queues the transcript fallback (video visits).
      */
     public function transition(Appointment $appointment, string $to): Appointment
     {
@@ -53,6 +54,14 @@ class AppointmentLifecycle
         }
 
         $appointment->update($changes);
+
+        // A video visit's transcript is normally started by the transcriber
+        // agent's /complete once its uploads are done; this covers an agent
+        // that never reports back, however the visit was completed.
+        if ($to === 'completed' && $transcript = $appointment->transcript) {
+            FinalizeConsultationTranscriptJob::dispatch($transcript)
+                ->delay(now()->addSeconds((int) config('services.transcriber.finalize_delay_seconds')));
+        }
 
         return $appointment;
     }

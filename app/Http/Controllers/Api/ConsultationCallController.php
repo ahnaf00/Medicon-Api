@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AppointmentResource;
-use App\Jobs\FinalizeConsultationTranscriptJob;
 use App\Models\Appointment;
 use App\Models\User;
 use App\Services\AppointmentLifecycle;
@@ -166,13 +165,6 @@ class ConsultationCallController extends Controller
         }
 
         $this->lifecycle->transition($appointment, 'completed');
-
-        // Normally the agent's /complete starts transcription once its uploads
-        // are done; this covers an agent that never reports back.
-        if ($transcript = $appointment->transcript) {
-            FinalizeConsultationTranscriptJob::dispatch($transcript)
-                ->delay(now()->addSeconds((int) config('services.transcriber.finalize_delay_seconds')));
-        }
 
         return response()->json([
             'message' => 'Consultation ended.',

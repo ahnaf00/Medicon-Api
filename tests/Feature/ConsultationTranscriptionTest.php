@@ -298,6 +298,18 @@ it('queues a delayed fallback when the doctor ends the call', function () {
         && $job->delay->equalTo(now()->addSeconds(180)));
 });
 
+it('queues the fallback when the visit is completed from the summary form', function () {
+    Queue::fake();
+    config(['services.transcriber.finalize_delay_seconds' => 180]);
+
+    $this->actingAs($this->doctor, 'sanctum')
+        ->patchJson("/api/v1/appointments/{$this->appointment->id}/status", ['status' => 'completed'])
+        ->assertOk();
+
+    Queue::assertPushed(FinalizeConsultationTranscriptJob::class, fn ($job) => $job->transcript->is($this->transcript)
+        && $job->delay->equalTo(now()->addSeconds(180)));
+});
+
 it('transcribes from the fallback when the agent never reported back', function () {
     Queue::fake();
     bothConsent($this->transcript);
