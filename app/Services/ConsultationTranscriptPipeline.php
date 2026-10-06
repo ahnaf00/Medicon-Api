@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SummarizeTranscriptJob;
 use App\Jobs\TranscribeConsultationJob;
 use App\Models\ConsultationTranscript;
 use Illuminate\Support\Facades\DB;
@@ -43,5 +44,45 @@ class ConsultationTranscriptPipeline
         if ($queued) {
             TranscribeConsultationJob::dispatch($transcript->fresh());
         }
+    }
+
+    /**
+     * Re-run a failed transcript from the step that failed: the summary alone
+     * when the transcription had finished, otherwise the transcription. The
+     * audio is always still there (failures never delete it).
+     *
+     * Returns false when the transcript is not in a retryable state.
+     */
+    public function retry(ConsultationTranscript $transcript): bool
+    {
+        $job = DB::transaction(function () use ($transcript) {
+            $locked = ConsultationTranscript::lockForUpdate()->find($transcript->getKey());
+
+            if (! $locked || $locked->status !== 'failed') {
+                return null;
+            }
+
+            if ($locked->transcribed_at !== null && $locked->segments()->exists()) {
+                $locked->update(['status' => 'summarizing', 'error' => null]);
+
+                return SummarizeTranscriptJob::class;
+            }
+
+            if ($locked->audioChunks()->exists()) {
+                $locked->update(['status' => 'transcribing', 'error' => null]);
+
+                return TranscribeConsultationJob::class;
+            }
+
+            return null;
+        });
+
+        if ($job === null) {
+            return false;
+        }
+
+        $job::dispatch($transcript->fresh());
+
+        return true;
     }
 }

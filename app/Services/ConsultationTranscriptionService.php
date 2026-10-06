@@ -129,9 +129,11 @@ PROMPT;
                 ]);
             }
 
+            // Nothing intelligible was said: there is nothing to summarise.
             $transcript->forceFill([
-                'status' => 'ready',
+                'status' => $segments === [] ? 'ready' : 'summarizing',
                 'error' => null,
+                'draft_summary' => null,
                 'language' => $this->overallLanguage($languages),
                 'transcribed_at' => now(),
             ])->save();

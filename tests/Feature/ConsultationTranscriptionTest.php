@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\FinalizeConsultationTranscriptJob;
+use App\Jobs\SummarizeTranscriptJob;
 use App\Jobs\TranscribeConsultationJob;
 use App\Models\Appointment;
 use App\Models\ConsultationAudioChunk;
@@ -330,13 +331,21 @@ it('produces interleaved, speaker-labelled segments', function () {
         ->push(geminiTranscript([
             ['start_seconds' => 3.0, 'text' => 'আমার তিন দিন ধরে কাশি।'],
             ['start_seconds' => 12.5, 'text' => 'About three days, doctor.'],
-        ], 'bn'));
+        ], 'bn'))
+        // The draft summary (task 6.7) follows the transcription.
+        ->push(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+            'chief_complaint' => 'Cough for three days.',
+            'findings' => 'Not discussed',
+            'advice' => 'Not discussed',
+            'red_flags' => [],
+        ])]]]]]]);
 
     // The queue is sync in tests, so this runs the whole pipeline.
     completeRoom($this->room)->assertOk();
 
     $transcript = $this->transcript->fresh();
     expect($transcript->status)->toBe('ready')
+        ->and($transcript->draft_summary['chief_complaint'])->toBe('Cough for three days.')
         ->and($transcript->language)->toBe('mixed')
         ->and($transcript->transcribed_at)->not->toBeNull()
         ->and($transcript->segments->map(fn ($s) => [$s->speaker_role, $s->start_ms, $s->text])->all())->toBe([
@@ -346,7 +355,7 @@ it('produces interleaved, speaker-labelled segments', function () {
             ['patient', 13000, 'About three days, doctor.'],
         ]);
 
-    Http::assertSent(fn (Request $r) => $r['contents'][0]['parts'][0]['inline_data']['mime_type'] === 'audio/flac'
+    Http::assertSent(fn (Request $r) => ($r['contents'][0]['parts'][0]['inline_data']['mime_type'] ?? null) === 'audio/flac'
         && $r->header('x-goog-api-key') === ['test-key']);
 });
 
@@ -382,6 +391,7 @@ it('fails safely when Gemini is not configured', function () {
 });
 
 it('keeps segments inside the chunk and in the model\'s order', function () {
+    Queue::fake([SummarizeTranscriptJob::class]);
     bothConsent($this->transcript);
     uploadChunk($this->room, ['duration_ms' => 10_000])->assertCreated();
     finishVisit($this->appointment);

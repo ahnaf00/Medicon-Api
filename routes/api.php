@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConsultationCallController;
 use App\Http\Controllers\Api\ConsultationChatController;
 use App\Http\Controllers\Api\ConsultationController;
+use App\Http\Controllers\Api\ConsultationTranscriptController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DoctorAvailabilityController;
 use App\Http\Controllers\Api\DoctorController;
@@ -76,6 +77,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/appointments', [AppointmentController::class, 'index']);
         Route::patch('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
         Route::get('/consultations/{appointmentId}/summary', [ConsultationController::class, 'show']);
+        Route::get('/consultations/{appointmentId}/transcript', [ConsultationTranscriptController::class, 'show']);
 
         // --- Video consultation (both participants; AppointmentPolicy::joinCall) ---
         Route::post('/appointments/{id}/call/consent', [ConsultationCallController::class, 'consent']);
@@ -95,6 +97,8 @@ Route::prefix('v1')->group(function () {
             Route::patch('/appointments/{id}/status', [AppointmentController::class, 'updateStatus']);
             Route::post('/appointments/{id}/call/end', [ConsultationCallController::class, 'end']);
             Route::put('/consultations/{appointmentId}/summary', [ConsultationController::class, 'upsert']);
+            Route::post('/consultations/{appointmentId}/transcript/retry', [ConsultationTranscriptController::class, 'retry'])
+                ->middleware('throttle:ai');
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
             Route::get('/patients', [PatientController::class, 'index']);
             Route::get('/patients/{id}', [PatientController::class, 'show']);

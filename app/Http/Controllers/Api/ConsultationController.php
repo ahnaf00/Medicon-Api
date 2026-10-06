@@ -49,6 +49,19 @@ class ConsultationController extends Controller
 
         $validated = $request->validated();
 
+        if (($validated['source'] ?? null) === 'transcript' && $appointment->transcript?->status !== 'ready') {
+            return response()->json([
+                'message' => 'This consultation has no finished call transcript.',
+                'errors'  => ['source' => ['This consultation has no finished call transcript.']],
+            ], 422);
+        }
+
+        // An edit that does not say otherwise keeps where the summary came from,
+        // so the patient keeps access to the transcript it was based on.
+        $source = $validated['source']
+            ?? ConsultationSummary::where('appointment_id', $appointment->id)->value('source')
+            ?? 'doctor_note';
+
         $summary = ConsultationSummary::updateOrCreate(
             ['appointment_id' => $appointment->id],
             [
@@ -58,7 +71,7 @@ class ConsultationController extends Controller
                 'findings'        => $validated['findings'] ?? null,
                 'advice'          => $validated['advice'] ?? null,
                 'red_flags'       => array_values($validated['red_flags'] ?? []),
-                'source'          => 'doctor_note',
+                'source'          => $source,
             ],
         );
 

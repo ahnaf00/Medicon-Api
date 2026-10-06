@@ -20,6 +20,9 @@ class UpsertConsultationSummaryRequest extends FormRequest
             'advice'          => ['nullable', 'string', 'max:5000'],
             'red_flags'       => ['nullable', 'array', 'max:10'],
             'red_flags.*'     => ['required', 'string', 'max:300'],
+            // `transcript` = the doctor started from the call transcript's AI
+            // draft; allowed only once that transcript is ready (controller).
+            'source'          => ['sometimes', 'string', 'in:doctor_note,transcript'],
         ];
     }
 }

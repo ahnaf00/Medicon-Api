@@ -13,7 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * both `doctor_consent` and `patient_consent` are true; every change is also
  * logged in `consentEvents` so chunks can be checked against the history.
  *
- * Status: awaiting_call → recording (first chunk) → transcribing → ready,
+ * Status: awaiting_call → recording (first chunk) → transcribing →
+ * summarizing → ready (`draft_summary` set; null when nothing was said),
  * or failed (audio kept, can be retried) / skipped (`skip_reason`).
  */
 class ConsultationTranscript extends Model

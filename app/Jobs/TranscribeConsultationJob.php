@@ -33,6 +33,10 @@ class TranscribeConsultationJob implements ShouldQueue
         }
 
         $service->transcribe($this->transcript);
+
+        if ($this->transcript->fresh()?->status === 'summarizing') {
+            SummarizeTranscriptJob::dispatch($this->transcript);
+        }
     }
 
     /**
