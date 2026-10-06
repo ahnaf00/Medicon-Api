@@ -14,8 +14,9 @@ use RuntimeException;
  *
  * Every answer is grounded in a record built from that appointment only: the
  * doctor's consultation summary, the prescription issued at that visit, the
- * patient's allergies/chronic conditions and their most recent vitals. The
- * reply is streamed from Gemini token by token.
+ * patient's allergies/chronic conditions and their most recent vitals, plus the
+ * video call's transcript once the doctor has reviewed it (saved a summary from
+ * it). The reply is streamed from Gemini token by token.
  */
 class ConsultationChatService
 {
@@ -26,6 +27,12 @@ class ConsultationChatService
 
     private const RECENT_VITALS = 5;
 
+    /**
+     * Characters of call transcript sent as grounding (roughly 6k tokens). A
+     * longer call keeps its most recent part; the summary always comes first.
+     */
+    public const TRANSCRIPT_CHAR_BUDGET = 24_000;
+
     private const SYSTEM_PROMPT = <<<'PROMPT'
 You are MediCon's consultation assistant. You help a patient in Bangladesh understand their own
 recent consultation with their doctor, using ONLY the CONSULTATION RECORD below.
@@ -34,6 +41,9 @@ Rules:
 - Answer only from the record. If the record does not contain the answer, say plainly that it was
   not recorded in this consultation and suggest asking the doctor. Never invent what the doctor said.
 - Never change a dose, add or stop a medicine, or diagnose anything new.
+- The record may include an automatic CALL TRANSCRIPT. Use it to answer what was discussed, but it
+  can contain transcription errors: where it differs from the doctor's summary, follow the summary,
+  and take medicine names and doses only from the prescription.
 - Speak to the patient as "you" and refer to the doctor by name. Use plain, friendly language,
   under 200 words, no tables.
 - If the patient describes anything listed under red flags, or anything that sounds like an
@@ -109,6 +119,7 @@ PROMPT;
             'doctor.doctorProfile',
             'patient.patientProfile',
             'consultationSummary',
+            'transcript',
             'prescription.items',
             'prescription.tests',
         ]);
@@ -149,7 +160,49 @@ PROMPT;
             'Recent vitals (latest first):'.$this->bullets($this->recentVitals($appointment)),
         ];
 
-        return implode("\n", $lines);
+        return implode("\n", array_merge($lines, $this->transcriptLines($appointment)));
+    }
+
+    /**
+     * The call transcript, only once the doctor has reviewed it: they saved the
+     * summary from it (`source = transcript`). Trimmed to the most recent part
+     * that fits TRANSCRIPT_CHAR_BUDGET.
+     *
+     * @return array<int, string>
+     */
+    private function transcriptLines(Appointment $appointment): array
+    {
+        $transcript = $appointment->transcript;
+        if ($appointment->consultationSummary?->source !== 'transcript' || $transcript?->status !== 'ready') {
+            return [];
+        }
+
+        $segments = $transcript->segments()->get();
+        $kept = [];
+        $used = 0;
+        foreach ($segments->reverse() as $segment) {
+            $line = sprintf(
+                '[%s] %s: %s',
+                TranscriptSummaryService::timestamp($segment->start_ms),
+                ucfirst($segment->speaker_role),
+                $segment->text,
+            );
+            $used += mb_strlen($line) + 1;
+            if ($used > self::TRANSCRIPT_CHAR_BUDGET) {
+                break;
+            }
+            $kept[] = $line;
+        }
+
+        if ($kept === []) {
+            return [];
+        }
+
+        return array_merge(
+            ['', "CALL TRANSCRIPT (automatic, may contain errors; the doctor's summary above takes precedence)"],
+            count($kept) < $segments->count() ? ['[Earlier part of the call omitted]'] : [],
+            array_reverse($kept),
+        );
     }
 
     private function textFromLine(string $line): string

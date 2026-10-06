@@ -6,6 +6,7 @@ use App\Models\ConsultationSummary;
 use App\Models\Prescription;
 use App\Models\PrescriptionItem;
 use App\Models\Vital;
+use App\Services\ConsultationChatService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -190,4 +191,55 @@ it('returns the patient\'s chat session with the summary', function () {
         ->getJson("/api/v1/consultations/{$this->appointment->id}/summary")
         ->assertOk()
         ->assertJsonPath('chatSessionId', $session->id);
+});
+
+// --- call transcript grounding (task 6.9) -----------------------------------
+
+function addReadyTranscript($appointment, array $lines): void
+{
+    $transcript = $appointment->transcript()->create(['status' => 'ready', 'transcribed_at' => now()]);
+    foreach ($lines as $i => [$role, $ms, $text]) {
+        $transcript->segments()->create(['speaker_role' => $role, 'start_ms' => $ms, 'text' => $text, 'order' => $i]);
+    }
+}
+
+it('grounds the chat on the call transcript once the doctor saved a summary from it', function () {
+    addReadyTranscript($this->appointment, [
+        ['doctor', 2_000, 'How long have you had the pain?'],
+        ['patient', 65_000, 'About two weeks, only when I run.'],
+    ]);
+    $this->appointment->consultationSummary->update(['source' => 'transcript']);
+
+    $context = app(ConsultationChatService::class)->context($this->appointment->fresh());
+
+    expect($context)
+        ->toContain("CALL TRANSCRIPT (automatic, may contain errors; the doctor's summary above takes precedence)")
+        ->toContain("[00:02] Doctor: How long have you had the pain?\n[01:05] Patient: About two weeks, only when I run.")
+        ->not->toContain('Earlier part of the call omitted')
+        // The doctor's summary still comes first.
+        ->and(strpos($context, 'Chief complaint: Chest pain after running'))->toBeLessThan(strpos($context, 'CALL TRANSCRIPT'));
+});
+
+it('leaves the transcript out until the doctor has reviewed it', function () {
+    addReadyTranscript($this->appointment, [['patient', 1_000, 'Something private']]);
+
+    $context = app(ConsultationChatService::class)->context($this->appointment->fresh());
+
+    expect($context)->not->toContain('CALL TRANSCRIPT')->not->toContain('Something private');
+});
+
+it('keeps the most recent part of a long transcript', function () {
+    $line = str_repeat('word ', 200);
+    $lines = collect(range(0, 59))->map(fn ($i) => ['patient', $i * 10_000, "#{$i} {$line}"])->all();
+    addReadyTranscript($this->appointment, $lines);
+    $this->appointment->consultationSummary->update(['source' => 'transcript']);
+
+    $context = app(ConsultationChatService::class)->context($this->appointment->fresh());
+    $transcriptPart = substr($context, strpos($context, 'CALL TRANSCRIPT'));
+
+    expect($transcriptPart)
+        ->toContain('[Earlier part of the call omitted]')
+        ->toContain('#59 ')
+        ->not->toContain('#0 ')
+        ->and(mb_strlen($transcriptPart))->toBeLessThan(ConsultationChatService::TRANSCRIPT_CHAR_BUDGET + 200);
 });
