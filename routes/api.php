@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DoctorAvailabilityController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\HospitalController;
+use App\Http\Controllers\Api\Internal\TranscriberController;
 use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\MedicineController;
 use App\Http\Controllers\Api\PatientController;
@@ -51,6 +52,13 @@ Route::prefix('v1')->group(function () {
 
     // Publicly search nearby hospitals & emergency facilities
     Route::get('/hospitals', [HospitalController::class, 'index']);
+
+    // Transcriber agent (tools/transcriber): not a user, authenticated by the
+    // shared X-Transcriber-Secret instead of Sanctum.
+    Route::prefix('internal/transcriber')->middleware(['transcriber', 'throttle:120,1'])->group(function () {
+        Route::post('/rooms/{room}/chunks', [TranscriberController::class, 'chunks']);
+        Route::post('/rooms/{room}/complete', [TranscriberController::class, 'complete']);
+    });
 
     // =====================================================================
     // 2. PROTECTED ROUTES (Requires Bearer Token via Sanctum)

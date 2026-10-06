@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AppointmentResource;
+use App\Jobs\FinalizeConsultationTranscriptJob;
 use App\Models\Appointment;
 use App\Models\User;
 use App\Services\AppointmentLifecycle;
@@ -50,10 +51,7 @@ class ConsultationCallController extends Controller
         $role = $this->roleOf($user, $appointment);
         $consent = (bool) $validated['consent'];
 
-        $appointment->transcript()->firstOrCreate([])->update([
-            "{$role}_consent" => $consent,
-            "{$role}_consent_at" => now(),
-        ]);
+        DB::transaction(fn () => $appointment->transcript()->firstOrCreate([])->recordConsent($role, $consent));
 
         // No room exists before the doctor starts the call; the stored choice
         // goes into the next token instead.
@@ -168,6 +166,13 @@ class ConsultationCallController extends Controller
         }
 
         $this->lifecycle->transition($appointment, 'completed');
+
+        // Normally the agent's /complete starts transcription once its uploads
+        // are done; this covers an agent that never reports back.
+        if ($transcript = $appointment->transcript) {
+            FinalizeConsultationTranscriptJob::dispatch($transcript)
+                ->delay(now()->addSeconds((int) config('services.transcriber.finalize_delay_seconds')));
+        }
 
         return response()->json([
             'message' => 'Consultation ended.',

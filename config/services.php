@@ -52,6 +52,13 @@ return [
     // Shared secret the Python transcriber agent sends as X-Transcriber-Secret.
     'transcriber' => [
         'secret' => env('TRANSCRIBER_SECRET'),
+        // How late the agent may learn of a consent change (see
+        // ConsultationTranscript::consentHeldThroughout). 0 = exact.
+        'consent_grace_ms' => (int) env('TRANSCRIBER_CONSENT_GRACE_MS', 2000),
+        // After the doctor ends a call, wait this long for the agent's uploads
+        // and /complete before finalising anyway (agent not running or crashed).
+        // Keep it above the agent's 90 s shutdown timeout.
+        'finalize_delay_seconds' => (int) env('TRANSCRIBER_FINALIZE_DELAY_SECONDS', 180),
     ],
 
 ];

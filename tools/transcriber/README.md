@@ -74,9 +74,33 @@ If the API is unreachable or rejects a chunk, the file stays in
 `storage/{room}/` and the log names it (`chunk kept on disk after failed
 upload`). Nothing is deleted without a successful upload.
 
-> Until task 6.6 adds the `/internal/transcriber/*` endpoints to Laravel, every
-> upload gets a 404 and chunks accumulate in `storage/`. Delete them by hand if
-> you do not need them; they contain consultation audio.
+What the API answers (task 6.6):
+
+| Answer | Meaning |
+|---|---|
+| `201` / `200 {"duplicate": true}` | Stored (or already stored by an earlier attempt); the local file is deleted |
+| `401` / `503` | Wrong or unconfigured `TRANSCRIBER_SECRET` |
+| `403` | Not a participant, or both had not consented **while the chunk was recorded** (checked against the consent log, with `TRANSCRIBER_CONSENT_GRACE_MS`, default 2 s, for the moment it takes the agent to see a change) |
+| `409` | The visit is not accepting audio (not started, or transcription already began) |
+| `413` / `422` | The chunk is too large or malformed |
+
+PHP's defaults (`upload_max_filesize=2M`, `post_max_size=8M`) reject a
+5-minute chunk (about 4-5 MB). In the `php.ini` used by `php artisan serve`
+(`php --ini` shows which), set:
+
+```ini
+upload_max_filesize = 16M
+post_max_size = 20M
+```
+
+Transcription runs on the queue, so a worker must be running
+(`php artisan queue:work --timeout=600`, or `composer run dev`). After the
+doctor ends the call, the agent's `/complete` starts it; if the agent never
+reports back, the API starts it anyway after `TRANSCRIBER_FINALIZE_DELAY_SECONDS`
+(default 180).
+
+Files that were refused stay in `storage/{room}/`. Delete them by hand if you
+do not need them; they contain consultation audio.
 
 ## Tests
 
