@@ -34,7 +34,7 @@ class ConsultationTranscriptResource extends JsonResource
                 'redFlags'       => $this->draft_summary['red_flags'] ?? [],
             ] : null),
             'segments' => $this->segments->map(fn (ConsultationTranscriptSegment $s) => [
-                'speaker' => $s->speaker_role,
+                'speakerRole' => $s->speaker_role,
                 'startMs' => $s->start_ms,
                 'text'    => $s->text,
             ])->values(),

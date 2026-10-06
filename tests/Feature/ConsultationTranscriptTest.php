@@ -140,7 +140,7 @@ it('shows the doctor the transcript with the AI draft', function () {
         ->assertJsonPath('data.status', 'ready')
         ->assertJsonPath('data.language', 'mixed')
         ->assertJsonPath('data.draftSummary.chiefComplaint', 'Cough.')
-        ->assertJsonPath('data.segments.1', ['speaker' => 'patient', 'startMs' => 3500, 'text' => 'আমার তিন দিন ধরে কাশি।']);
+        ->assertJsonPath('data.segments.1', ['speakerRole' => 'patient', 'startMs' => 3500, 'text' => 'আমার তিন দিন ধরে কাশি।']);
 });
 
 it('hides the transcript from the patient until the doctor saves a transcript-based summary', function () {
