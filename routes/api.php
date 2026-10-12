@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Api\AiChatController;
-use App\Http\Controllers\Api\AiTriageController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConsultationCallController;
@@ -118,10 +117,6 @@ Route::prefix('v1')->group(function () {
         // --- Vitals Tracking Domain ---
         Route::get('/vitals', [VitalController::class, 'index']);
         Route::post('/vitals', [VitalController::class, 'store']);
-
-        // --- AI Symptom Triage (stricter rate limit) ---
-        Route::post('/ai/triage', [AiTriageController::class, 'store'])
-            ->middleware('throttle:ai');
 
         // --- Symptom search: triage + ranked doctors ---
         Route::post('/symptom-search', [SymptomSearchController::class, 'search'])

@@ -248,3 +248,9 @@ describe('slots endpoint (shared slot logic)', function () {
             ->assertJsonPath('note', 'Doctor is not available on this day.');
     });
 });
+
+it('no longer exposes the legacy keyword triage endpoint', function () {
+    $this->actingAs(makePatient(), 'sanctum')
+        ->postJson('/api/v1/ai/triage', ['symptoms' => 'mild headache'])
+        ->assertNotFound();
+});
