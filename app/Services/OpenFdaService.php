@@ -37,7 +37,7 @@ class OpenFdaService
     public function checkInteractions(array $medicineNames): array
     {
         return [
-            'disclaimer' => 'Interaction checking is currently powered by a basic heuristic. Consult a pharmacist for clinical decisions.',
+            'disclaimer' => 'Only a very small list of known combinations is recognised. A pair marked "not checked" has not been confirmed safe. Consult a doctor or pharmacist.',
             'pairs'      => $this->basicHeuristicCheck($medicineNames),
         ];
     }
@@ -53,21 +53,27 @@ class OpenFdaService
         $results = [];
         foreach ($names as $i => $nameA) {
             foreach (array_slice($names, $i + 1) as $nameB) {
-                foreach ($knownInteractions as [$drugA, $drugB, $warning]) {
+                $warning = null;
+                foreach ($knownInteractions as [$drugA, $drugB, $text]) {
                     $matchA = str_contains(strtolower($nameA), $drugA) || str_contains(strtolower($nameB), $drugA);
                     $matchB = str_contains(strtolower($nameA), $drugB) || str_contains(strtolower($nameB), $drugB);
 
                     if ($matchA && $matchB) {
-                        $results[] = [
-                            'pair' => [$nameA, $nameB],
-                            'warning' => $warning,
-                            'severity' => 'high'
-                        ];
+                        $warning = $text;
+                        break;
                     }
                 }
+
+                // No rule matched: the pair was not checked, which is not the same as safe.
+                $results[] = [
+                    'pair' => [$nameA, $nameB],
+                    'warning' => $warning ?? 'Not checked — ask your doctor or pharmacist.',
+                    'severity' => $warning !== null ? 'high' : 'unknown',
+                    'checked' => $warning !== null,
+                ];
             }
         }
 
-        return $results ?: [['pair' => $names, 'warning' => 'No known interactions found.', 'severity' => 'none']];
+        return $results;
     }
 }
