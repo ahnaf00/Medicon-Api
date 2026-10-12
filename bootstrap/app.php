@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAccountActive;
 use App\Http\Middleware\EnsureDoctorVerified;
 use App\Http\Middleware\VerifyTranscriberSecret;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'doctor.verified' => EnsureDoctorVerified::class,
+            'account.active' => EnsureAccountActive::class,
             'transcriber' => VerifyTranscriberSecret::class,
         ]);
     })

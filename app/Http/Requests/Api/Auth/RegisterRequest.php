@@ -22,6 +22,8 @@ class RegisterRequest extends FormRequest
             'phone' => ['required', 'string', 'max:20', 'unique:users,phone'],
             'password' => ['nullable', 'string', 'min:6'],
             'role' => ['required', 'string', 'in:patient,doctor'],
+            // Issued by POST /auth/verify-otp for a phone with no account yet.
+            'registration_token' => ['required', 'string'],
 
             // Doctor-specific optional onboarding fields
             'specialty' => ['required_if:role,doctor', 'nullable', 'string', 'max:255'],

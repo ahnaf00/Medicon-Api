@@ -65,7 +65,7 @@ Route::prefix('v1')->group(function () {
     // 2. PROTECTED ROUTES (Requires Bearer Token via Sanctum)
     // =====================================================================
 
-    Route::middleware(['auth:sanctum', 'throttle:global'])->group(function () {
+    Route::middleware(['auth:sanctum', 'account.active', 'throttle:global'])->group(function () {
 
         // --- User Profile & Auth ---
         Route::get('/user/me', [AuthController::class, 'me']);

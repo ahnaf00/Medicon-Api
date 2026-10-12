@@ -23,6 +23,7 @@ describe('doctor verification', function () {
             'name' => 'Not A Doctor',
             'phone' => '+8801700000001',
             'role' => 'doctor',
+            'registration_token' => verifyNewPhone('+8801700000001'),
             'specialty' => 'Cardiology',
             'qualification' => 'MBBS',
         ])->assertCreated()->json('access_token');

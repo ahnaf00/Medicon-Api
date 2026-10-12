@@ -39,6 +39,12 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
     ],
 
+    // Phone login has no SMS provider. Demo mode accepts the fixed code 123456
+    // for every phone; with it off, send-otp answers 503.
+    'otp' => [
+        'demo_mode' => (bool) env('OTP_DEMO_MODE', false),
+    ],
+
     // Self-hosted LiveKit for in-app video consultations (Phase 6).
     // `url` is what phones connect to (LAN IP); `http_url` is what Laravel
     // uses for the server API (RoomService), normally the same host locally.
