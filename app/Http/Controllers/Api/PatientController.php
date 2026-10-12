@@ -16,7 +16,9 @@ class PatientController extends Controller
         $doctorId = $request->user()->id;
 
         // Get the IDs of all distinct patients this doctor has seen
+        // (same rule as User::hasAppointmentWithPatient: cancelled bookings don't count)
         $patientIds = Appointment::where('doctor_user_id', $doctorId)
+            ->where('status', '!=', 'cancelled')
             ->distinct()
             ->pluck('patient_user_id');
 

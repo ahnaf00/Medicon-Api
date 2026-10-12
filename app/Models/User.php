@@ -67,11 +67,13 @@ class User extends Authenticatable
 
     /**
      * A doctor may only access a patient's data once the patient has booked with them.
+     * A cancelled booking does not count: it never became a visit.
      */
     public function hasAppointmentWithPatient(int $patientUserId): bool
     {
         return $this->appointmentsAsDoctor()
             ->where('patient_user_id', $patientUserId)
+            ->where('status', '!=', 'cancelled')
             ->exists();
     }
 
