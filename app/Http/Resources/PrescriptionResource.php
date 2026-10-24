@@ -23,7 +23,10 @@ class PrescriptionResource extends JsonResource
             'status'            => $this->status,
             'doctor'            => new UserResource($this->whenLoaded('doctor')),
             'patient'           => new UserResource($this->whenLoaded('patient')),
-            'medicines'         => PrescriptionItemResource::collection($this->whenLoaded('items')),
+            'medicines'         => $this->whenLoaded('items', fn () => PrescriptionItemResource::collection(
+                // Items need their prescription to know who is the prescriber.
+                $this->items->each->setRelation('prescription', $this->resource)
+            )),
             'tests'             => $this->whenLoaded('tests', fn () => $this->tests->map(fn ($test) => [
                 'id'            => $test->id,
                 'name'          => $test->name,

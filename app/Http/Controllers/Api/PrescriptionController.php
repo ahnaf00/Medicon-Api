@@ -7,6 +7,7 @@ use App\Http\Requests\Api\Prescriptions\StorePrescriptionRequest;
 use App\Http\Resources\PrescriptionDocumentResource;
 use App\Http\Resources\PrescriptionResource;
 use App\Models\Prescription;
+use App\Http\Requests\Api\Prescriptions\UpdateExplanationRequest;
 use App\Services\MedicineExplainerService;
 use App\Services\PrescriptionPdfService;
 use Illuminate\Http\JsonResponse;
@@ -112,6 +113,32 @@ class PrescriptionController extends Controller
             'Content-Disposition'   => 'attachment; filename="'.$pdfService->filename($prescription).'"',
             'Cache-Control'         => 'private, no-store',
         ]);
+    }
+
+    /**
+     * PATCH /prescriptions/{id}/items/{itemId}/explanation — the prescribing doctor
+     * rewrites a medicine's explanation (it then reads "from your doctor") and/or
+     * hides it from the patient (audit CLIN-006).
+     */
+    public function updateExplanation(UpdateExplanationRequest $request, $id, $itemId): PrescriptionResource
+    {
+        $prescription = Prescription::findOrFail($id);
+
+        Gate::authorize('update', $prescription);
+
+        $item = $prescription->items()->findOrFail($itemId);
+        $validated = $request->validated();
+
+        if (array_key_exists('explanation', $validated)) {
+            $item->explanation = trim($validated['explanation']);
+            $item->explanation_source = 'doctor';
+        }
+        if (array_key_exists('hidden', $validated)) {
+            $item->explanation_hidden = (bool) $validated['hidden'];
+        }
+        $item->save();
+
+        return new PrescriptionResource($this->findViewable($id));
     }
 
     private function findViewable($id): Prescription

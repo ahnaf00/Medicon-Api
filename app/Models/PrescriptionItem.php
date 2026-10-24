@@ -18,10 +18,13 @@ class PrescriptionItem extends Model
         'instructions',
         'duration_days',
         'explanation',
+        'explanation_source',
+        'explanation_hidden',
     ];
     protected $casts = [
         'dosage_schedule' => 'array', // Automatically casts JSON string to PHP array
         'duration_days' => 'integer',
+        'explanation_hidden' => 'boolean',
     ];
     public function prescription(): BelongsTo
     {

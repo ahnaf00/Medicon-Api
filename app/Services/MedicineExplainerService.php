@@ -45,7 +45,7 @@ PROMPT;
         $explanation = $this->findCached($item) ?? $this->generate($item);
 
         if ($explanation !== null) {
-            $item->forceFill(['explanation' => $explanation])->save();
+            $item->forceFill(['explanation' => $explanation, 'explanation_source' => 'ai'])->save();
         }
 
         return $explanation;
@@ -58,6 +58,10 @@ PROMPT;
             ->whereRaw('LOWER(TRIM(medicine_name)) = ?', [mb_strtolower(trim($item->medicine_name))])
             ->whereRaw('LOWER(TRIM(dosage)) = ?', [mb_strtolower(trim($item->dosage))])
             ->whereNotNull('explanation')
+            // Only model text is shared: a doctor's own note, or text a doctor
+            // hid, is about one patient and never copied to another (audit CLIN-006).
+            ->where('explanation_source', 'ai')
+            ->where('explanation_hidden', false)
             ->value('explanation');
     }
 

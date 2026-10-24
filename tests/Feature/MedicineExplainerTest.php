@@ -32,7 +32,7 @@ it('generates and stores an explanation', function () {
 
 it('reuses an explanation already written for the same medicine and dosage', function () {
     Http::fake();
-    PrescriptionItem::factory()->create(['medicine_name' => 'Napa', 'dosage' => '500mg', 'explanation' => 'Cached text.']);
+    PrescriptionItem::factory()->create(['medicine_name' => 'Napa', 'dosage' => '500mg', 'explanation' => 'Cached text.', 'explanation_source' => 'ai']);
     $item = PrescriptionItem::factory()->create(['medicine_name' => ' napa ', 'dosage' => '500MG', 'explanation' => null]);
 
     app(MedicineExplainerService::class)->explain($item);
@@ -43,7 +43,7 @@ it('reuses an explanation already written for the same medicine and dosage', fun
 
 it('does not reuse an explanation for a different dosage', function () {
     Http::fake(['generativelanguage.googleapis.com/*' => Http::response(geminiReply('Fresh text.'))]);
-    PrescriptionItem::factory()->create(['medicine_name' => 'Napa', 'dosage' => '500mg', 'explanation' => 'Cached text.']);
+    PrescriptionItem::factory()->create(['medicine_name' => 'Napa', 'dosage' => '500mg', 'explanation' => 'Cached text.', 'explanation_source' => 'ai']);
     $item = PrescriptionItem::factory()->create(['medicine_name' => 'Napa', 'dosage' => '1g', 'explanation' => null]);
 
     app(MedicineExplainerService::class)->explain($item);

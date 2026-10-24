@@ -100,6 +100,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/consultations/{appointmentId}/transcript/retry', [ConsultationTranscriptController::class, 'retry'])
                 ->middleware('throttle:ai');
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
+            Route::patch('/prescriptions/{id}/items/{itemId}/explanation', [PrescriptionController::class, 'updateExplanation']);
             Route::get('/patients', [PatientController::class, 'index']);
             Route::get('/patients/{id}', [PatientController::class, 'show']);
 

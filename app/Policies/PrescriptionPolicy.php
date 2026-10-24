@@ -15,6 +15,12 @@ class PrescriptionPolicy
             || $user->id === (int) $prescription->doctor_user_id;
     }
 
+    /** Only the prescribing doctor reviews what the patient reads about it (audit CLIN-006). */
+    public function update(User $user, Prescription $prescription): bool
+    {
+        return $user->isVerifiedDoctor() && $user->id === (int) $prescription->doctor_user_id;
+    }
+
     /** A visit that has actually taken place (or is taking place) — the only basis for a prescription. */
     public const PRESCRIBABLE_VISIT_STATUSES = ['in_progress', 'completed'];
 
