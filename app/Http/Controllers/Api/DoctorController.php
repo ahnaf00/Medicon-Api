@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\PublicDoctorResource;
 use App\Models\User;
 use App\Services\SymptomTriageService;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +27,7 @@ class DoctorController extends Controller
             ))
             ->get();
 
-        return UserResource::collection($doctors);
+        return PublicDoctorResource::collection($doctors);
     }
 
     /**
@@ -47,12 +47,12 @@ class DoctorController extends Controller
             ->values()]);
     }
 
-    public function show(int $id):UserResource
+    public function show(int $id): PublicDoctorResource
     {
         $doctor = User::verifiedDoctors()
                 ->with('doctorProfile')
                 ->findOrFail($id);
 
-            return new UserResource($doctor);
-        }
+        return new PublicDoctorResource($doctor);
+    }
 }

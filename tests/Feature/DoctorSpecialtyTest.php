@@ -47,3 +47,15 @@ it('only lets a doctor sign up with a listed specialty', function () {
         'qualification' => 'MBBS',
     ])->assertUnprocessable()->assertJsonValidationErrors('specialty');
 });
+
+it('never exposes a doctor\'s email, phone or account status publicly', function () {
+    $doctor = makeDoctor('verified', 'Cardiology');
+
+    $list = $this->getJson('/api/v1/doctors')->assertOk()->json('data.0');
+    $one = $this->getJson("/api/v1/doctors/{$doctor->id}")->assertOk()->json('data');
+
+    foreach ([$list, $one] as $body) {
+        expect($body)->toHaveKeys(['id', 'name', 'doctorProfile', 'avatarUrl'])
+            ->and($body)->not->toHaveKeys(['email', 'phone', 'status']);
+    }
+});

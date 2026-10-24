@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\PublicDoctorResource;
 use App\Models\DoctorProfile;
 use App\Services\DoctorRankingService;
 use App\Services\SymptomTriageService;
@@ -31,7 +31,7 @@ class SymptomSearchController extends Controller
             'urgency' => $result['urgency'],
             'redFlag' => $result['redFlag'],
             'source' => $result['source'],
-            'doctors' => UserResource::collection($doctors)->resolve($request),
+            'doctors' => PublicDoctorResource::collection($doctors)->resolve($request),
         ]);
     }
 }
