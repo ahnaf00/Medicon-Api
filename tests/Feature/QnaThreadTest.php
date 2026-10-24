@@ -186,3 +186,23 @@ describe('editing an answer (task 5.2)', function () {
             ->assertNotFound();
     });
 });
+
+describe('asking a specific doctor (audit F5 / SEC-011)', function () {
+    it('accepts a verified doctor', function () {
+        $this->actingAs($this->patient, 'sanctum')
+            ->postJson('/api/v1/conversations', ['department' => 'Cardiology', 'doctor_user_id' => $this->doctor->id])
+            ->assertCreated();
+    });
+
+    it('rejects a patient, an unverified doctor, or an unknown id', function () {
+        $other = makePatient();
+        $pending = makeDoctor('pending', 'Cardiology');
+
+        foreach ([$other->id, $pending->id, 999999] as $id) {
+            $this->actingAs($this->patient, 'sanctum')
+                ->postJson('/api/v1/conversations', ['department' => 'Cardiology', 'doctor_user_id' => $id])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('doctor_user_id');
+        }
+    });
+});
