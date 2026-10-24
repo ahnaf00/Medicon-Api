@@ -7,6 +7,7 @@ use App\Models\AiChatSession;
 use App\Models\Appointment;
 use App\Services\ConsultationChatService;
 use App\Services\SymptomTriageService;
+use App\Support\ExecutionTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\StreamedEvent;
@@ -18,6 +19,9 @@ use Throwable;
 class ConsultationChatController extends Controller
 {
     private const INTERRUPTED_MARKER = "\n\n[Response interrupted]";
+
+    /** Gemini may take 60 s to start, then streams; the app gives up at 90 s. */
+    private const STREAM_TIME_LIMIT_SECONDS = 85;
 
     /**
      * POST /ai/consultation-chat — streams (SSE) an answer grounded in one
@@ -62,6 +66,8 @@ class ConsultationChatController extends Controller
         $redFlag = $triage->screen($validated['message']);
 
         return response()->eventStream(function () use ($chat, $appointment, $session, $history, $validated, $redFlag) {
+            ExecutionTime::atLeast(self::STREAM_TIME_LIMIT_SECONDS);
+
             yield new StreamedEvent('session', ['sessionId' => $session->id]);
 
             if ($redFlag !== null) {

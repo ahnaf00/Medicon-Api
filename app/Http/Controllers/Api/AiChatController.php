@@ -9,6 +9,7 @@ use App\Models\AiChatMessage;
 use App\Models\AiChatSession;
 use App\Services\GeminiEndpoint;
 use App\Services\SymptomTriageService;
+use App\Support\ExecutionTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -39,6 +40,9 @@ class AiChatController extends Controller
 
         // Checked by fixed rules, not the model, and returned even when the AI fails (audit CLIN-004).
         $redFlag = $triage->screen($request->message);
+
+        // Gemini gets 30 s and the app waits 45 s; PHP's web limit is 30 s (audit E8).
+        ExecutionTime::atLeast(40);
 
         $reply = $this->generateReply($history, $request->message);
 
