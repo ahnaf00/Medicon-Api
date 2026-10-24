@@ -72,6 +72,19 @@ it('lets a verified doctor change the hospital but not the verified BMDC number'
         ->bmdc_registration_no->toBe('A-11111');
 });
 
+it('lets a verified doctor who never entered a BMDC number add it once', function () {
+    $doctor = makeDoctor();
+
+    $this->actingAs($doctor, 'sanctum')
+        ->putJson('/api/v1/user/me', ['bmdc_registration_no' => 'A-33333'])
+        ->assertOk();
+    expect($doctor->doctorProfile->fresh()->bmdc_registration_no)->toBe('A-33333');
+
+    $this->actingAs($doctor->fresh(), 'sanctum')
+        ->putJson('/api/v1/user/me', ['bmdc_registration_no' => 'A-44444'])
+        ->assertUnprocessable();
+});
+
 it('keeps a doctor\'s department on the list when editing the profile', function () {
     $doctor = makeDoctor();
 

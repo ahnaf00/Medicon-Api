@@ -46,8 +46,9 @@ class UpdateProfileRequest extends FormRequest
             $rules['specialty']         = ['sometimes', 'string', Rule::in(SymptomTriageService::SPECIALTIES)];
             $rules['qualification']     = ['sometimes', 'string', 'max:255'];
             // Printed on prescriptions (audit D2). The registration number is the
-            // credential checked at verification, so it is fixed once verified.
-            $rules['bmdc_registration_no'] = $user->isVerifiedDoctor()
+            // credential checked at verification, so a verified doctor can't change
+            // it — only add it once if it was never entered.
+            $rules['bmdc_registration_no'] = $user->isVerifiedDoctor() && filled($user->doctorProfile?->bmdc_registration_no)
                 ? ['prohibited']
                 : ['sometimes', 'string', 'max:30', 'regex:/\d/'];
             $rules['hospital_name']     = ['sometimes', 'nullable', 'string', 'max:255'];
