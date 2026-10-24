@@ -79,7 +79,7 @@ it('explains each medicine after a prescription is issued and returns it on the 
     $this->seed(RolesAndPermissionsSeeder::class);
     $doctor = makeDoctor();
     $patient = makePatient();
-    bookAppointment($patient, $doctor);
+    bookAppointment($patient, $doctor)->update(['status' => 'completed']); // prescribing needs a visit (F7)
     Http::fake(['generativelanguage.googleapis.com/*' => Http::response(geminiReply('Explained.'))]);
 
     $id = $this->actingAs($doctor, 'sanctum')

@@ -12,6 +12,7 @@ beforeEach(function () {
     $this->doctor = makeDoctor();
     $this->patient = makePatient();
     $this->appointment = bookAppointment($this->patient, $this->doctor);
+    $this->appointment->update(['status' => 'completed']); // prescribing needs a visit (F7)
 });
 
 function fullPrescriptionPayload(int $patientId, int $appointmentId, array $overrides = []): array
