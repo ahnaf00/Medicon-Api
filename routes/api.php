@@ -47,6 +47,7 @@ Route::prefix('v1')->group(function () {
 
     // Publicly browse doctors and doctor details
     Route::get('/doctors', [DoctorController::class, 'index']);
+    Route::get('/specialties', [DoctorController::class, 'specialties']);
     Route::get('/doctors/{id}', [DoctorController::class, 'show']);
     Route::get('/doctors/{id}/slots', [DoctorAvailabilityController::class, 'slots']);
 

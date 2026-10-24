@@ -23,7 +23,7 @@ use Throwable;
 class SymptomTriageService
 {
 
-    /** Must match the doctor categories the app offers (doctorsService.getCategories). */
+    /** The doctor departments; served to the app by GET /specialties. */
     public const SPECIALTIES = [
         'General Medicine',
         'Cardiology',
