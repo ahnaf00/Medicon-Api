@@ -17,13 +17,17 @@ class HospitalFactory extends Factory
      */
     public function definition(): array
     {
+        // Test data only. Names say so, and the phone number cannot reach anyone:
+        // a random +8802 number could belong to a real person.
+        $n = $this->faker->unique()->numberBetween(1, 999);
+
         return [
-            'name' => $this->faker->company() . ' Hospital & Medical Center',
-            'address' => $this->faker->streetAddress() . ', Dhaka',
+            'name' => "Sample Hospital {$n} (test data)",
+            'address' => "Test address {$n}, Dhaka",
             'latitude' => $this->faker->latitude(23.7, 23.9),
             'longitude' => $this->faker->longitude(90.3, 90.5),
-            'emergency_phone' => '+8802' . $this->faker->numerify('#######'),
-            'is_24_7' => true,
+            'emergency_phone' => '+880 0000-000000',
+            'is_24_7' => $this->faker->boolean(),
         ];
     }
 }
