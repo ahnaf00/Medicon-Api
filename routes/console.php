@@ -1,8 +1,10 @@
 <?php
 
 use App\Models\Appointment;
+use App\Models\ConsultationTranscript;
 use App\Models\Prescription;
 use App\Models\User;
+use App\Services\ConsultationTranscriptPipeline;
 use App\Services\DoctorSlotService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -102,5 +104,23 @@ Artisan::command('prescriptions:complete-ended', function () {
 
     return 0;
 })->purpose('Mark active prescriptions whose course has ended as completed');
+
+// Safety net for the delayed finalize job queued when a visit is completed: a
+// transcript still "awaiting the call" or "recording" an hour after the visit
+// ended is finalized now (transcribed if audio arrived, otherwise "not
+// recorded"), so the app never shows "Finishing the recording…" forever (P12).
+Artisan::command('transcripts:finalize-stale', function (ConsultationTranscriptPipeline $pipeline) {
+    $stale = ConsultationTranscript::whereIn('status', ConsultationTranscript::OPEN_STATUSES)
+        ->whereHas('appointment', fn ($q) => $q->where('status', 'completed')
+            ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '<', now()->subHour())))
+        ->get();
+
+    $stale->each(fn (ConsultationTranscript $t) => $pipeline->finalize($t));
+    $this->info("Finalized {$stale->count()} stale transcript(s).");
+
+    return 0;
+})->purpose('Finalize transcripts left open after their visit ended');
+
+Schedule::command('transcripts:finalize-stale')->hourly();
 
 Schedule::command('prescriptions:complete-ended')->dailyAt('00:10')->timezone(DoctorSlotService::timezone());
