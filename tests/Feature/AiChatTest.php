@@ -90,3 +90,33 @@ it('does not continue another user\'s session', function () {
 
     Http::assertNothingSent();
 });
+
+// Audit CLIN-004: the same fixed emergency screen as symptom search, model or not.
+describe('red flags', function () {
+    it('flags an emergency alongside the AI reply', function () {
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(aiChatReply('Please get help.'))]);
+
+        $this->actingAs($this->patient, 'sanctum')
+            ->postJson('/api/v1/ai/chat', ['message' => 'my father took an overdose'])
+            ->assertCreated()
+            ->assertJsonPath('redFlag.code', 'poisoning');
+    });
+
+    it('still flags the emergency when the AI is down', function () {
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response('error', 500)]);
+
+        $this->actingAs($this->patient, 'sanctum')
+            ->postJson('/api/v1/ai/chat', ['message' => 'I think I am having a heart attack'])
+            ->assertStatus(503)
+            ->assertJsonPath('redFlag.code', 'heart_attack');
+    });
+
+    it('sends no flag for an ordinary question', function () {
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(aiChatReply('Rest.'))]);
+
+        $this->actingAs($this->patient, 'sanctum')
+            ->postJson('/api/v1/ai/chat', ['message' => 'I have a mild headache'])
+            ->assertCreated()
+            ->assertJsonPath('redFlag', null);
+    });
+});

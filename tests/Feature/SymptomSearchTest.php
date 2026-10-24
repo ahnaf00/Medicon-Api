@@ -83,6 +83,21 @@ describe('red flags', function () {
         ['her face is drooping and she has slurred speech', 'stroke', 'Neurology'],
         ['he is coughing up blood', 'bleeding', 'General Medicine'],
         ['I keep thinking about suicide', 'self_harm', 'Psychiatry'],
+        ['I think my dad is having a heart attack', 'heart_attack', 'Cardiology'],
+        ['মনে হচ্ছে হার্ট অ্যাটাক হচ্ছে', 'heart_attack', 'Cardiology'],
+        ['my son took an overdose of paracetamol', 'poisoning', 'General Medicine'],
+        ['she swallowed some bleach', 'poisoning', 'General Medicine'],
+        ['he took too many pills', 'poisoning', 'General Medicine'],
+        ['I think I was poisoned', 'poisoning', 'General Medicine'],
+        ['বাচ্চা বিষ খেয়েছে', 'poisoning', 'General Medicine'],
+    ]);
+
+    it('does not flag a normal dose or the Bengali word for "topic"', function (string $query) {
+        expect(app(\App\Services\SymptomTriageService::class)->screen($query))->toBeNull();
+    })->with([
+        'I took 2 tablets of paracetamol for a headache',
+        'এই বিষয়ে প্রশ্ন আছে',
+        'my heart rate is a bit fast after coffee',
     ]);
 
     it('does not flag ordinary complaints', function () {

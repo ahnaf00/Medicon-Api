@@ -60,6 +60,14 @@ class SymptomTriageService
             'specialty' => 'Cardiology',
             'message' => 'Chest pain can be a sign of a heart attack.',
         ],
+        'heart_attack' => [
+            'patterns' => [
+                '/heart\s*attack|cardiac\s+arrest/iu',
+                '/হার্ট\s*অ্যাটাক/u',
+            ],
+            'specialty' => 'Cardiology',
+            'message' => 'A heart attack is an emergency. Every minute matters.',
+        ],
         'breathing' => [
             'patterns' => [
                 '/(difficulty|trouble|hard|struggling)\s+(in\s+)?breathing/iu',
@@ -118,6 +126,17 @@ class SymptomTriageService
             'specialty' => 'General Medicine',
             'message' => 'Swelling of the throat or tongue can block breathing.',
         ],
+        'poisoning' => [
+            'patterns' => [
+                '/overdos/iu',
+                '/poison/iu',
+                '/(swallowed|drank|drunk|ate|took)\s+(some\s+)?(bleach|pesticide|insecticide|kerosene|acid|rat\s+killer)/iu',
+                '/(took|swallowed|taken)\s+(too\s+many|a\s+lot\s+of|lots\s+of|a\s+whole\s+(bottle|strip)\s+of)\s+(pills|tablets|medicine)/iu',
+                '/বিষ\s*খে|বিষক্রিয়া|অতিরিক্ত\s*ওষুধ\s*খে/u',
+            ],
+            'specialty' => 'General Medicine',
+            'message' => 'Poisoning or an overdose needs urgent care, even if the person seems fine.',
+        ],
         'self_harm' => [
             'patterns' => [
                 '/suicid|kill\s+myself|end\s+my\s+life|self[\s-]?harm/iu',
@@ -166,12 +185,12 @@ PROMPT;
      */
     public function triage(string $query): array
     {
-        $redFlag = $this->redFlag($query);
+        $redFlag = $this->screen($query);
         if ($redFlag !== null) {
             return [
-                'specialty' => self::RED_FLAGS[$redFlag]['specialty'],
+                'specialty' => self::RED_FLAGS[$redFlag['code']]['specialty'],
                 'urgency' => 'emergency',
-                'redFlag' => ['code' => $redFlag, 'message' => self::RED_FLAGS[$redFlag]['message']],
+                'redFlag' => $redFlag,
                 'source' => 'rules',
             ];
         }
@@ -189,12 +208,18 @@ PROMPT;
         ];
     }
 
-    private function redFlag(string $query): ?string
+    /**
+     * The deterministic emergency screen, without the model. Symptom search and
+     * both AI chats run every message through it (audit CLIN-004).
+     *
+     * @return array{code: string, message: string}|null
+     */
+    public function screen(string $text): ?array
     {
         foreach (self::RED_FLAGS as $code => $flag) {
             foreach ($flag['patterns'] as $pattern) {
-                if (preg_match($pattern, $query)) {
-                    return $code;
+                if (preg_match($pattern, $text)) {
+                    return ['code' => $code, 'message' => $flag['message']];
                 }
             }
         }

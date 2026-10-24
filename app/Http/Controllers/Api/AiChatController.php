@@ -8,6 +8,7 @@ use App\Http\Resources\AiChatSessionResource;
 use App\Models\AiChatMessage;
 use App\Models\AiChatSession;
 use App\Services\GeminiEndpoint;
+use App\Services\SymptomTriageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -20,7 +21,7 @@ class AiChatController extends Controller
     /** Earlier turns sent with each request, so follow-up questions have context. */
     public const HISTORY_LIMIT = 20;
 
-    public function chat(Request $request): JsonResponse
+    public function chat(Request $request, SymptomTriageService $triage): JsonResponse
     {
         $request->validate(['message' => ['required', 'string', 'max:2000'], 'session_id' => ['nullable', 'exists:ai_chat_sessions,id']]);
 
@@ -36,12 +37,16 @@ class AiChatController extends Controller
             ? $session->messages()->latest('id')->limit(self::HISTORY_LIMIT)->get()->reverse()->values()
             : collect();
 
+        // Checked by fixed rules, not the model, and returned even when the AI fails (audit CLIN-004).
+        $redFlag = $triage->screen($request->message);
+
         $reply = $this->generateReply($history, $request->message);
 
         // Nothing is saved when the AI fails, so a failure never shows up as an answer.
         if ($reply === null) {
             return response()->json([
                 'message' => 'The AI assistant is unavailable right now. Please try again in a moment.',
+                'redFlag' => $redFlag,
             ], 503);
         }
 
@@ -53,6 +58,7 @@ class AiChatController extends Controller
         return response()->json([
             'sessionId' => $session->id,
             'message' => new AiChatMessageResource($aiMessage),
+            'redFlag' => $redFlag,
         ], 201);
     }
 

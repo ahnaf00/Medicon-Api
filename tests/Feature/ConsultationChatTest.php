@@ -243,3 +243,21 @@ it('keeps the most recent part of a long transcript', function () {
         ->not->toContain('#0 ')
         ->and(mb_strlen($transcriptPart))->toBeLessThan(ConsultationChatService::TRANSCRIPT_CHAR_BUDGET + 200);
 });
+
+// Audit CLIN-004: the consultation chat runs the same fixed emergency screen.
+it('sends a redFlag event before the reply when the question sounds like an emergency', function () {
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response(geminiSse(['Call 999.']))]);
+
+    $events = sseEvents(askConsultation($this->patient, $this->appointment, 'I have chest pain again right now')->streamedContent());
+
+    expect(array_column($events, 'event'))->toBe(['session', 'redFlag', 'delta', 'done'])
+        ->and($events[1]['data']['code'])->toBe('chest_pain');
+});
+
+it('sends the redFlag event even when the AI fails', function () {
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => 'boom'], 500)]);
+
+    $events = sseEvents(askConsultation($this->patient, $this->appointment, 'he swallowed some bleach')->streamedContent());
+
+    expect(array_column($events, 'event'))->toBe(['session', 'redFlag', 'error']);
+});
