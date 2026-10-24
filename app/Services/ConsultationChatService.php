@@ -20,7 +20,6 @@ use RuntimeException;
  */
 class ConsultationChatService
 {
-    private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:streamGenerateContent?alt=sse';
 
     /** Previous turns sent with each request, so follow-up questions have context. */
     public const HISTORY_LIMIT = 20;
@@ -79,7 +78,7 @@ PROMPT;
         $response = Http::timeout(60)
             ->withHeaders(['x-goog-api-key' => $apiKey])
             ->withOptions(['stream' => true])
-            ->post(self::ENDPOINT, [
+            ->post(GeminiEndpoint::stream(), [
                 'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT."\n\n".$this->context($appointment)]]],
                 'contents' => $contents,
                 'generationConfig' => ['temperature' => 0.3],

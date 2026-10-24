@@ -12,6 +12,7 @@ beforeEach(function () {
     $this->doctor = makeDoctor();
     $this->patient = makePatient();
     $this->appointment = bookAppointment($this->patient, $this->doctor);
+    $this->appointment->update(['status' => 'completed']); // prescribing needs a visit (F7)
     $this->prescription = Prescription::factory()->create([
         'patient_user_id' => $this->patient->id,
         'doctor_user_id' => $this->doctor->id,
@@ -78,10 +79,31 @@ describe('issuing', function () {
 
     it("forbids attaching another doctor's appointment", function () {
         $otherAppointment = bookAppointment($this->patient, makeDoctor());
+        $otherAppointment->update(['status' => 'completed']);
 
         $this->actingAs($this->doctor, 'sanctum')
             ->postJson('/api/v1/prescriptions', prescriptionPayload($this->patient->id, $otherAppointment->id))
             ->assertForbidden();
+    });
+
+    it('forbids prescribing for a visit that has not happened (audit F7)', function (string $status) {
+        $this->appointment->update(['status' => $status]);
+
+        $this->actingAs($this->doctor, 'sanctum')
+            ->postJson('/api/v1/prescriptions', prescriptionPayload($this->patient->id, $this->appointment->id))
+            ->assertForbidden()
+            ->assertJsonPath('message', 'You can prescribe only for a consultation with this patient that has started or finished.');
+        $this->actingAs($this->doctor, 'sanctum')
+            ->postJson('/api/v1/prescriptions', prescriptionPayload($this->patient->id))
+            ->assertForbidden();
+    })->with(['scheduled', 'cancelled', 'no_show']);
+
+    it('allows prescribing during a visit in progress (audit F7)', function () {
+        $this->appointment->update(['status' => 'in_progress']);
+
+        $this->actingAs($this->doctor, 'sanctum')
+            ->postJson('/api/v1/prescriptions', prescriptionPayload($this->patient->id, $this->appointment->id))
+            ->assertCreated();
     });
 
     it('forbids an unverified doctor', function () {

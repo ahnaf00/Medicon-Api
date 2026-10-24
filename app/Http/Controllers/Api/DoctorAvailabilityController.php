@@ -10,6 +10,8 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class DoctorAvailabilityController extends Controller
@@ -85,16 +87,29 @@ class DoctorAvailabilityController extends Controller
 
     public function updateSlots(Request $request): JsonResponse
     {
+        $daysMap = ['Sunday'=>0, 'Monday'=>1, 'Tuesday'=>2, 'Wednesday'=>3, 'Thursday'=>4, 'Friday'=>5, 'Saturday'=>6];
+
+        // Times arrive as "09:00 AM", the format getSlots returns (audit SEC-010).
         $request->validate([
-            'schedule' => 'required|array',
-            'schedule.*.day' => 'required|string',
-            'schedule.*.startTime' => 'required|string',
-            'schedule.*.endTime' => 'required|string',
+            'schedule' => 'required|array|max:7',
+            'schedule.*.day' => ['required', 'string', Rule::in(array_keys($daysMap))],
+            'schedule.*.startTime' => 'required|date_format:h:i A',
+            'schedule.*.endTime' => 'required|date_format:h:i A',
             'schedule.*.isWorkingDay' => 'required|boolean',
         ]);
 
+        // A working day must end after it starts.
+        foreach ($request->schedule as $i => $item) {
+            $start = Carbon::createFromFormat('h:i A', $item['startTime']);
+            $end = Carbon::createFromFormat('h:i A', $item['endTime']);
+            if ($item['isWorkingDay'] && $end->lte($start)) {
+                throw ValidationException::withMessages([
+                    "schedule.{$i}.endTime" => "{$item['day']}: the end time must be after the start time.",
+                ]);
+            }
+        }
+
         $doctorId = $request->user()->id;
-        $daysMap = ['Sunday'=>0, 'Monday'=>1, 'Tuesday'=>2, 'Wednesday'=>3, 'Thursday'=>4, 'Friday'=>5, 'Saturday'=>6];
 
         DB::beginTransaction();
         try {
@@ -122,7 +137,10 @@ class DoctorAvailabilityController extends Controller
             return response()->json(['message' => 'Schedule updated successfully']);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to update schedule: ' . $e->getMessage()], 500);
+            // The exception text can carry SQL and internals; log it, don't return it.
+            Log::error('Doctor schedule update failed ('.class_basename($e).')', ['doctor_user_id' => $doctorId]);
+
+            return response()->json(['message' => 'Could not save your schedule. Please try again.'], 500);
         }
     }
 

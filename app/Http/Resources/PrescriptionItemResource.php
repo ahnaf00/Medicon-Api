@@ -14,6 +14,11 @@ class PrescriptionItemResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // The prescribing doctor also sees what they hid; the patient never does.
+        $isPrescriber = $this->relationLoaded('prescription')
+            && $request->user()?->id === (int) $this->prescription->doctor_user_id;
+        $showExplanation = $isPrescriber || ! $this->explanation_hidden;
+
         return [
             'id'                => $this->id,
             'name'              => $this->medicine_name,
@@ -22,7 +27,10 @@ class PrescriptionItemResource extends JsonResource
             'dosageSchedule'    => $this->dosage_schedule,
             'instructions'      => $this->instructions,
             'durationDays'      => $this->duration_days,
-            'explanation'       => $this->explanation,
+            'explanation'       => $showExplanation ? $this->explanation : null,
+            // ai | doctor — the app labels AI text as AI-generated (audit CLIN-006).
+            'explanationSource' => $showExplanation && $this->explanation !== null ? ($this->explanation_source ?? 'ai') : null,
+            'explanationHidden' => $this->when($isPrescriber, (bool) $this->explanation_hidden),
         ];
     }
 }

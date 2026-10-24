@@ -7,14 +7,18 @@ use App\Http\Requests\Api\Prescriptions\StorePrescriptionRequest;
 use App\Http\Resources\PrescriptionDocumentResource;
 use App\Http\Resources\PrescriptionResource;
 use App\Models\Prescription;
+use App\Http\Requests\Api\Prescriptions\UpdateExplanationRequest;
 use App\Services\MedicineExplainerService;
 use App\Services\PrescriptionPdfService;
+use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 use function Illuminate\Support\defer;
 
@@ -48,7 +52,29 @@ class PrescriptionController extends Controller
             isset($validated['appointment_id']) ? (int) $validated['appointment_id'] : null,
         ]);
 
-        $prescription = DB::transaction(function () use ($validated, $doctor) {
+        try {
+            $prescription = $this->createPrescription($validated, $doctor);
+        } catch (UniqueConstraintViolationException) {
+            // Two saves for the same visit at once: the validation rule passed for
+            // both, the unique index stopped the second (audit G1).
+            throw ValidationException::withMessages([
+                'appointment_id' => [StorePrescriptionRequest::ONE_PER_VISIT],
+            ]);
+        }
+
+        // Write the "Why take this medicine?" text after the response is sent,
+        // so the doctor never waits on the model.
+        defer(fn () => $explainer->explainPrescription($prescription));
+
+        return response()->json([
+            'message'       => 'Prescription issued successfully.',
+            'prescription'  => $prescription->load(['items', 'tests']),
+        ], 201);
+    }
+
+    private function createPrescription(array $validated, User $doctor): Prescription
+    {
+        return DB::transaction(function () use ($validated, $doctor) {
             $prescription = Prescription::create([
                 'appointment_id'        => $validated['appointment_id'] ?? null,
                 'patient_user_id'       => $validated['patient_user_id'],
@@ -76,15 +102,6 @@ class PrescriptionController extends Controller
             }
             return $prescription;
         });
-
-        // Write the "Why take this medicine?" text after the response is sent,
-        // so the doctor never waits on the model.
-        defer(fn () => $explainer->explainPrescription($prescription));
-
-        return response()->json([
-            'message'       => 'Prescription issued successfully.',
-            'prescription'  => $prescription->load(['items', 'tests']),
-        ], 201);
     }
 
     public function show(Request $request, $id): PrescriptionResource
@@ -112,6 +129,32 @@ class PrescriptionController extends Controller
             'Content-Disposition'   => 'attachment; filename="'.$pdfService->filename($prescription).'"',
             'Cache-Control'         => 'private, no-store',
         ]);
+    }
+
+    /**
+     * PATCH /prescriptions/{id}/items/{itemId}/explanation — the prescribing doctor
+     * rewrites a medicine's explanation (it then reads "from your doctor") and/or
+     * hides it from the patient (audit CLIN-006).
+     */
+    public function updateExplanation(UpdateExplanationRequest $request, $id, $itemId): PrescriptionResource
+    {
+        $prescription = Prescription::findOrFail($id);
+
+        Gate::authorize('update', $prescription);
+
+        $item = $prescription->items()->findOrFail($itemId);
+        $validated = $request->validated();
+
+        if (array_key_exists('explanation', $validated)) {
+            $item->explanation = trim($validated['explanation']);
+            $item->explanation_source = 'doctor';
+        }
+        if (array_key_exists('hidden', $validated)) {
+            $item->explanation_hidden = (bool) $validated['hidden'];
+        }
+        $item->save();
+
+        return new PrescriptionResource($this->findViewable($id));
     }
 
     private function findViewable($id): Prescription

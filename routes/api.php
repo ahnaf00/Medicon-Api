@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Api\AiChatController;
-use App\Http\Controllers\Api\AiTriageController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConsultationCallController;
@@ -40,14 +39,15 @@ Route::prefix('v1')->group(function () {
     // =====================================================================
 
     Route::prefix('auth')->middleware('throttle:6,1')->group(function () {
-        Route::post('/send-otp', [AuthController::class, 'sendOtp']);
-        Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
+        Route::post('/send-otp', [AuthController::class, 'sendOtp'])->middleware('throttle:otp-send');
+        Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
     });
 
     // Publicly browse doctors and doctor details
     Route::get('/doctors', [DoctorController::class, 'index']);
+    Route::get('/specialties', [DoctorController::class, 'specialties']);
     Route::get('/doctors/{id}', [DoctorController::class, 'show']);
     Route::get('/doctors/{id}/slots', [DoctorAvailabilityController::class, 'slots']);
 
@@ -65,7 +65,7 @@ Route::prefix('v1')->group(function () {
     // 2. PROTECTED ROUTES (Requires Bearer Token via Sanctum)
     // =====================================================================
 
-    Route::middleware(['auth:sanctum', 'throttle:global'])->group(function () {
+    Route::middleware(['auth:sanctum', 'account.active', 'throttle:global'])->group(function () {
 
         // --- User Profile & Auth ---
         Route::get('/user/me', [AuthController::class, 'me']);
@@ -100,6 +100,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/consultations/{appointmentId}/transcript/retry', [ConsultationTranscriptController::class, 'retry'])
                 ->middleware('throttle:ai');
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
+            Route::patch('/prescriptions/{id}/items/{itemId}/explanation', [PrescriptionController::class, 'updateExplanation']);
             Route::get('/patients', [PatientController::class, 'index']);
             Route::get('/patients/{id}', [PatientController::class, 'show']);
 
@@ -118,10 +119,6 @@ Route::prefix('v1')->group(function () {
         // --- Vitals Tracking Domain ---
         Route::get('/vitals', [VitalController::class, 'index']);
         Route::post('/vitals', [VitalController::class, 'store']);
-
-        // --- AI Symptom Triage (stricter rate limit) ---
-        Route::post('/ai/triage', [AiTriageController::class, 'store'])
-            ->middleware('throttle:ai');
 
         // --- Symptom search: triage + ranked doctors ---
         Route::post('/symptom-search', [SymptomSearchController::class, 'search'])

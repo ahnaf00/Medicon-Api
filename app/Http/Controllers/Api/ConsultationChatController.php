@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AiChatSession;
 use App\Models\Appointment;
 use App\Services\ConsultationChatService;
+use App\Services\SymptomTriageService;
+use App\Support\ExecutionTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\StreamedEvent;
@@ -18,12 +20,16 @@ class ConsultationChatController extends Controller
 {
     private const INTERRUPTED_MARKER = "\n\n[Response interrupted]";
 
+    /** Gemini may take 60 s to start, then streams; the app gives up at 90 s. */
+    private const STREAM_TIME_LIMIT_SECONDS = 85;
+
     /**
      * POST /ai/consultation-chat — streams (SSE) an answer grounded in one
-     * completed consultation. Events: `session` {sessionId}, `delta` {text},
-     * then `done` {messageId} or `error` {message}.
+     * completed consultation. Events: `session` {sessionId}, `redFlag` {code, message}
+     * when the question sounds like an emergency, `delta` {text}, then `done`
+     * {messageId} or `error` {message}.
      */
-    public function chat(Request $request, ConsultationChatService $chat): StreamedResponse|JsonResponse
+    public function chat(Request $request, ConsultationChatService $chat, SymptomTriageService $triage): StreamedResponse|JsonResponse
     {
         $validated = $request->validate([
             'appointment_id' => ['required', 'integer'],
@@ -56,8 +62,17 @@ class ConsultationChatController extends Controller
         $session->messages()->create(['role' => 'user', 'content' => $validated['message']]);
         $session->touch();
 
-        return response()->eventStream(function () use ($chat, $appointment, $session, $history, $validated) {
+        // Checked by fixed rules before the model, so it shows even if the AI fails (audit CLIN-004).
+        $redFlag = $triage->screen($validated['message']);
+
+        return response()->eventStream(function () use ($chat, $appointment, $session, $history, $validated, $redFlag) {
+            ExecutionTime::atLeast(self::STREAM_TIME_LIMIT_SECONDS);
+
             yield new StreamedEvent('session', ['sessionId' => $session->id]);
+
+            if ($redFlag !== null) {
+                yield new StreamedEvent('redFlag', $redFlag);
+            }
 
             $reply = '';
             try {

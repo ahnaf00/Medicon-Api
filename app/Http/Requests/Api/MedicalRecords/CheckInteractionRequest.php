@@ -17,7 +17,7 @@ class CheckInteractionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'medicines'        => ['required', 'array', 'min:2', 'max:5'],
+            'medicines'        => ['required', 'array', 'min:2', 'max:20'],
             'medicines.*.name' => ['required', 'string', 'max:100'],
         ];
     }

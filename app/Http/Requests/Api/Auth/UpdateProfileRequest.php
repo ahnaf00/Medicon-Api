@@ -2,10 +2,23 @@
 
 namespace App\Http\Requests\Api\Auth;
 
+use App\Services\SymptomTriageService;
+use App\Http\Requests\Api\Auth\Concerns\NormalizesPhone;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateProfileRequest extends FormRequest
 {
+    use NormalizesPhone;
+
+    public function messages(): array
+    {
+        return $this->phoneMessages() + [
+            'bmdc_registration_no.prohibited' => 'Your BMDC registration number was verified and cannot be changed here. Contact MediCon support.',
+            'bmdc_registration_no.regex' => 'Enter your BMDC registration number, e.g. A-12345.',
+        ];
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -20,7 +33,7 @@ class UpdateProfileRequest extends FormRequest
         $rules = [
             // User fields
             'name'  => ['sometimes', 'string', 'max:255'],
-            'phone' => ['sometimes', 'string', 'max:20', 'unique:users,phone,' . $user->id],
+            'phone' => ['sometimes', 'string', 'max:20', ...self::phoneRule(), 'unique:users,phone,' . $user->id],
         ];
         // Patient-specific fields
         if ($user->hasRole('patient')) {
@@ -32,8 +45,16 @@ class UpdateProfileRequest extends FormRequest
         }
         // Doctor-specific fields
         if ($user->hasRole('doctor')) {
-            $rules['specialty']         = ['sometimes', 'string', 'max:255'];
+            // Same department list as registration (audit P13).
+            $rules['specialty']         = ['sometimes', 'string', Rule::in(SymptomTriageService::SPECIALTIES)];
             $rules['qualification']     = ['sometimes', 'string', 'max:255'];
+            // Printed on prescriptions (audit D2). The registration number is the
+            // credential checked at verification, so a verified doctor can't change
+            // it — only add it once if it was never entered.
+            $rules['bmdc_registration_no'] = $user->isVerifiedDoctor() && filled($user->doctorProfile?->bmdc_registration_no)
+                ? ['prohibited']
+                : ['sometimes', 'string', 'max:30', 'regex:/\d/'];
+            $rules['hospital_name']     = ['sometimes', 'nullable', 'string', 'max:255'];
             $rules['experience_years']  = ['sometimes', 'integer', 'min:0', 'max:60'];
             $rules['consultation_fee']  = ['sometimes', 'numeric', 'min:0'];
             $rules['bio']               = ['sometimes', 'string', 'max:2000'];

@@ -186,3 +186,46 @@ describe('editing an answer (task 5.2)', function () {
             ->assertNotFound();
     });
 });
+
+describe('asking a specific doctor (audit F5 / SEC-011)', function () {
+    it('accepts a verified doctor', function () {
+        $this->actingAs($this->patient, 'sanctum')
+            ->postJson('/api/v1/conversations', ['department' => 'Cardiology', 'doctor_user_id' => $this->doctor->id])
+            ->assertCreated();
+    });
+
+    it('rejects a patient, an unverified doctor, or an unknown id', function () {
+        $other = makePatient();
+        $pending = makeDoctor('pending', 'Cardiology');
+
+        foreach ([$other->id, $pending->id, 999999] as $id) {
+            $this->actingAs($this->patient, 'sanctum')
+                ->postJson('/api/v1/conversations', ['department' => 'Cardiology', 'doctor_user_id' => $id])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('doctor_user_id');
+        }
+    });
+});
+
+describe('claiming a question (audit F6)', function () {
+    it('lets only one of two doctors answering at once claim it', function () {
+        $question = askQuestion($this);
+        $rival = makeDoctor('verified', 'Cardiology');
+
+        // The rival's claim lands just after this request has loaded the question.
+        Conversation::retrieved(function (Conversation $c) use ($question, $rival) {
+            static $done = false;
+            if (! $done && $c->id === $question->id) {
+                $done = true;
+                Conversation::whereKey($c->id)->update(['doctor_user_id' => $rival->id]);
+            }
+        });
+
+        $this->actingAs($this->doctor, 'sanctum')
+            ->postJson("/api/v1/conversations/{$question->id}/messages", ['body' => 'Please rest.'])
+            ->assertStatus(409);
+
+        expect($question->fresh()->doctor_user_id)->toBe($rival->id)
+            ->and($question->messages()->where('sender_user_id', $this->doctor->id)->exists())->toBeFalse();
+    });
+});

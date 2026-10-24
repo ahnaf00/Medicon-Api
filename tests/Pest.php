@@ -49,6 +49,19 @@ function something()
     // ..
 }
 
+/** Runs send-otp + verify-otp for a phone with no account and returns the registration proof. */
+function verifyNewPhone(string $phone): string
+{
+    config(['services.otp.demo_mode' => true]);
+
+    test()->postJson('/api/v1/auth/send-otp', ['phone' => $phone])->assertOk();
+
+    return test()->postJson('/api/v1/auth/verify-otp', ['phone' => $phone, 'otp' => '123456'])
+        ->assertOk()
+        ->assertJsonPath('isNewUser', true)
+        ->json('registration_token');
+}
+
 function makePatient(array $profile = []): \App\Models\User
 {
     $user = \App\Models\User::factory()->create();

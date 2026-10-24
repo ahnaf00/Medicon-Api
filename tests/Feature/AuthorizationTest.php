@@ -23,8 +23,10 @@ describe('doctor verification', function () {
             'name' => 'Not A Doctor',
             'phone' => '+8801700000001',
             'role' => 'doctor',
+            'registration_token' => verifyNewPhone('+8801700000001'),
             'specialty' => 'Cardiology',
             'qualification' => 'MBBS',
+            'bmdc_registration_no' => 'A-99999',
         ])->assertCreated()->json('access_token');
 
         $this->withToken($token)
@@ -57,6 +59,32 @@ describe('patient profile access', function () {
         $this->actingAs(makeDoctor(), 'sanctum')
             ->getJson("/api/v1/patients/{$patient->id}")
             ->assertForbidden();
+    });
+
+    it('forbids and hides a patient whose only booking was cancelled', function () {
+        $doctor = makeDoctor();
+        $patient = makePatient();
+        bookAppointment($patient, $doctor)->update(['status' => 'cancelled']);
+
+        $this->actingAs($doctor, 'sanctum')
+            ->getJson("/api/v1/patients/{$patient->id}")
+            ->assertForbidden();
+
+        $this->actingAs($doctor, 'sanctum')
+            ->getJson('/api/v1/patients')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    });
+
+    it('returns the allergies the patient recorded', function () {
+        $doctor = makeDoctor();
+        $patient = makePatient(['allergies' => 'Penicillin']);
+        bookAppointment($patient, $doctor);
+
+        $this->actingAs($doctor, 'sanctum')
+            ->getJson("/api/v1/patients/{$patient->id}")
+            ->assertOk()
+            ->assertJsonPath('data.patientProfile.allergies', 'Penicillin');
     });
 
     it('forbids a patient from the doctor-only patient endpoint', function () {

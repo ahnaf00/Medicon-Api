@@ -18,7 +18,6 @@ use Throwable;
  */
 class MedicineExplainerService
 {
-    private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
     private const SYSTEM_PROMPT = <<<'PROMPT'
 You explain a prescribed medicine to a patient in Bangladesh in plain, friendly English.
@@ -46,7 +45,7 @@ PROMPT;
         $explanation = $this->findCached($item) ?? $this->generate($item);
 
         if ($explanation !== null) {
-            $item->forceFill(['explanation' => $explanation])->save();
+            $item->forceFill(['explanation' => $explanation, 'explanation_source' => 'ai'])->save();
         }
 
         return $explanation;
@@ -59,6 +58,10 @@ PROMPT;
             ->whereRaw('LOWER(TRIM(medicine_name)) = ?', [mb_strtolower(trim($item->medicine_name))])
             ->whereRaw('LOWER(TRIM(dosage)) = ?', [mb_strtolower(trim($item->dosage))])
             ->whereNotNull('explanation')
+            // Only model text is shared: a doctor's own note, or text a doctor
+            // hid, is about one patient and never copied to another (audit CLIN-006).
+            ->where('explanation_source', 'ai')
+            ->where('explanation_hidden', false)
             ->value('explanation');
     }
 
@@ -72,7 +75,7 @@ PROMPT;
         try {
             $response = Http::timeout(15)
                 ->withHeaders(['x-goog-api-key' => $apiKey])
-                ->post(self::ENDPOINT, [
+                ->post(GeminiEndpoint::generate(), [
                     'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT]]],
                     'contents' => [[
                         'parts' => [['text' => "Medicine: {$item->medicine_name}\nStrength: {$item->dosage}"]],

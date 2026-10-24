@@ -2,18 +2,29 @@
 
 namespace App\Http\Requests\Api\Prescriptions;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePrescriptionRequest extends FormRequest
 {
+    // One prescription per visit (audit G1).
+    public const ONE_PER_VISIT = 'This visit already has a prescription. Open it from the patient\'s prescriptions.';
+
     public function authorize(): bool
     {
         return $this->user() && $this->user()->hasRole('doctor');
     }
 
+    public function messages(): array
+    {
+        return [
+            'appointment_id.unique' => self::ONE_PER_VISIT,
+        ];
+    }
+
     public function rules(): array
     {
         return [
-            'appointment_id'                => ['nullable', 'exists:appointments,id'],
+            'appointment_id'                => ['nullable', 'exists:appointments,id', Rule::unique('prescriptions', 'appointment_id')],
             'patient_user_id'               => ['required', 'exists:users,id'],
             'diagnosis_summary'             => ['required', 'string', 'max:2000'],
             'medicines'                     => ['required', 'array', 'min:1'],

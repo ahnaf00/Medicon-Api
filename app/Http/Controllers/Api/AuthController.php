@@ -15,16 +15,36 @@ use App\Models\PhoneOtp;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    private const DEMO_OTP = '123456';
+
+    private static function registrationProofKey(string $phone): string
+    {
+        return 'registration_proof:'.$phone;
+    }
+
     public function register(RegisterRequest $request): JsonResponse
     {
         $validated = $request->validated();
+
+        // Registration is only allowed with the single-use proof verifyOtp()
+        // issued for this same phone, so nobody can claim someone else's number.
+        $proofKey = self::registrationProofKey($validated['phone']);
+        $expected = Cache::get($proofKey);
+
+        if (! $expected || ! hash_equals($expected, hash('sha256', $validated['registration_token']))) {
+            throw ValidationException::withMessages([
+                'registration_token' => ['Phone verification is missing or has expired. Verify your phone again.'],
+            ]);
+        }
 
         $user = DB::transaction(function () use ($validated) {
             $user = User::create([
@@ -42,6 +62,8 @@ class AuthController extends Controller
                     'user_id' => $user->id,
                     'specialty' => $validated['specialty'],
                     'qualification' => $validated['qualification'],
+                    'bmdc_registration_no' => $validated['bmdc_registration_no'] ?? null,
+                    'hospital_name' => $validated['hospital_name'] ?? null,
                     'consultation_fee' => $validated['consultation_fee'] ?? 0.00,
                     'verification_status' => 'pending',
                 ]);
@@ -60,6 +82,8 @@ class AuthController extends Controller
 
             return $user;
         });
+
+        Cache::forget($proofKey);
 
         $token = $user->createToken('auth_token')->plainTextToken;
         return response()->json([
@@ -82,9 +106,15 @@ class AuthController extends Controller
         $validated = $request->validated();
         $phone = $validated['phone'];
 
-        $otp = app()->environment('local') ? '123456' : sprintf("%06d", mt_rand(1, 999999));
-        
-        \Illuminate\Support\Facades\Log::info("OTP for {$phone} is {$otp}");
+        // No SMS provider is integrated, so a real code could never reach the
+        // user. The only working mode is the explicit demo mode with a fixed code.
+        if (! config('services.otp.demo_mode')) {
+            return response()->json([
+                'message' => 'OTP delivery is not configured on this server.',
+            ], 503);
+        }
+
+        $otp = self::DEMO_OTP;
 
         PhoneOtp::updateOrCreate(
             ['phone' => $phone],
@@ -95,7 +125,10 @@ class AuthController extends Controller
             ]
         );
 
-        return response()->json(['message' => 'OTP sent successfully.'], 200);
+        return response()->json([
+            'message' => 'Demo mode: no SMS is sent. Use the demo code '.self::DEMO_OTP.'.',
+            'demo' => true,
+        ], 200);
     }
 
     public function verifyOtp(VerifyOtpRequest $request): JsonResponse
@@ -124,7 +157,10 @@ class AuthController extends Controller
         $user = User::where('phone', $phone)->first();
 
         if (!$user) {
-            return response()->json(['isNewUser' => true], 200);
+            $proof = Str::random(64);
+            Cache::put(self::registrationProofKey($phone), hash('sha256', $proof), now()->addMinutes(15));
+
+            return response()->json(['isNewUser' => true, 'registration_token' => $proof], 200);
         }
 
         if ($user->status === 'suspended') {
@@ -161,10 +197,7 @@ class AuthController extends Controller
         }
 
         if ($user->status === 'suspended') {
-            return response()->json([
-                'message' => 'Account is suspended',
-                403
-            ]);
+            return response()->json(['message' => 'Account is suspended'], 403);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -228,6 +261,8 @@ class AuthController extends Controller
                 'experience_years',
                 'consultation_fee',
                 'bio',
+                'bmdc_registration_no',
+                'hospital_name',
             ]));
             $user->doctorProfile()->updateOrCreate(['user_id' => $user->id], $profileFields);
         }

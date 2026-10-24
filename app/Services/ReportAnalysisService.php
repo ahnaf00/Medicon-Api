@@ -21,7 +21,6 @@ use Throwable;
  */
 class ReportAnalysisService
 {
-    private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
     /** Gemini rejects inline requests above ~20 MB; stay safely below it. */
     private const MAX_INLINE_BYTES = 18 * 1024 * 1024;
@@ -80,7 +79,7 @@ PROMPT;
 
         $response = Http::timeout(60)
             ->withHeaders(['x-goog-api-key' => $apiKey])
-            ->post(self::ENDPOINT, [
+            ->post(GeminiEndpoint::generate(), [
                 'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT]]],
                 'contents' => [['parts' => $this->pageParts($record)]],
                 'generationConfig' => [
