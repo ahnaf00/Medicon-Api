@@ -1,9 +1,12 @@
 <?php
 
 use App\Models\Appointment;
+use App\Models\Prescription;
 use App\Models\User;
+use App\Services\DoctorSlotService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -73,3 +76,31 @@ Artisan::command('demo:video-call
 
     return 0;
 })->purpose('Create a video appointment between test accounts that is ready to start now');
+
+// A course ends on its issue day + the longest medicine duration - 1 (Dhaka dates,
+// as the app shows them). Ended prescriptions stop being "active" (audit P10).
+Artisan::command('prescriptions:complete-ended', function () {
+    $tz = DoctorSlotService::timezone();
+    $today = now($tz)->startOfDay();
+    $done = 0;
+
+    Prescription::where('status', 'active')
+        ->withMax('items', 'duration_days')
+        ->chunkById(200, function ($prescriptions) use ($tz, $today, &$done) {
+            foreach ($prescriptions as $prescription) {
+                $lastDay = $prescription->created_at->copy()->setTimezone($tz)->startOfDay()
+                    ->addDays(max(1, (int) $prescription->items_max_duration_days) - 1);
+
+                if ($lastDay->lt($today)) {
+                    $prescription->update(['status' => 'completed']);
+                    $done++;
+                }
+            }
+        });
+
+    $this->info("Marked {$done} ended prescription(s) completed.");
+
+    return 0;
+})->purpose('Mark active prescriptions whose course has ended as completed');
+
+Schedule::command('prescriptions:complete-ended')->dailyAt('00:10')->timezone(DoctorSlotService::timezone());
