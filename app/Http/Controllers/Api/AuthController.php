@@ -62,6 +62,8 @@ class AuthController extends Controller
                     'user_id' => $user->id,
                     'specialty' => $validated['specialty'],
                     'qualification' => $validated['qualification'],
+                    'bmdc_registration_no' => $validated['bmdc_registration_no'] ?? null,
+                    'hospital_name' => $validated['hospital_name'] ?? null,
                     'consultation_fee' => $validated['consultation_fee'] ?? 0.00,
                     'verification_status' => 'pending',
                 ]);
@@ -259,6 +261,8 @@ class AuthController extends Controller
                 'experience_years',
                 'consultation_fee',
                 'bio',
+                'bmdc_registration_no',
+                'hospital_name',
             ]));
             $user->doctorProfile()->updateOrCreate(['user_id' => $user->id], $profileFields);
         }

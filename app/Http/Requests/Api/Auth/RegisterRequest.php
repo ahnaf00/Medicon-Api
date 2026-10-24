@@ -16,6 +16,14 @@ class RegisterRequest extends FormRequest
         return true;
     }
 
+    public function messages(): array
+    {
+        return [
+            'bmdc_registration_no.required_if' => 'Enter your BMDC registration number.',
+            'bmdc_registration_no.regex' => 'Enter your BMDC registration number, e.g. A-12345.',
+        ];
+    }
+
     public function rules(): array
     {
         return [
@@ -31,6 +39,9 @@ class RegisterRequest extends FormRequest
             // One of the departments patients browse and symptom search recommends from.
             'specialty' => ['required_if:role,doctor', 'nullable', 'string', Rule::in(SymptomTriageService::SPECIALTIES)],
             'qualification' => ['required_if:role,doctor', 'nullable', 'string', 'max:255'],
+            // Printed on every prescription and checked when the doctor is verified (audit D2).
+            'bmdc_registration_no' => ['required_if:role,doctor', 'nullable', 'string', 'max:30', 'regex:/\d/'],
+            'hospital_name' => ['nullable', 'string', 'max:255'],
             'consultation_fee' => ['nullable', 'numeric', 'min:0'],
 
             // Patient-specific optional onboarding fields

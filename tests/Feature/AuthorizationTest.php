@@ -26,6 +26,7 @@ describe('doctor verification', function () {
             'registration_token' => verifyNewPhone('+8801700000001'),
             'specialty' => 'Cardiology',
             'qualification' => 'MBBS',
+            'bmdc_registration_no' => 'A-99999',
         ])->assertCreated()->json('access_token');
 
         $this->withToken($token)
