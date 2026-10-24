@@ -15,18 +15,71 @@ class AppointmentLifecycle
 {
     /** Allowed status moves: from => [to, ...]. */
     private const TRANSITIONS = [
-        'scheduled'   => ['in_progress', 'no_show'],
+        'scheduled'   => ['in_progress', 'no_show', 'expired'],
         'in_progress' => ['completed'],
     ];
 
+    /** The doctor may start a visit this many minutes before its time (audit F10)... */
+    public const START_EARLY_MINUTES = 15;
+
+    /** ...and until this many minutes after it; an unstarted visit then expires. */
+    public const START_LATE_MINUTES = 120;
+
+    /** A visit still "in progress" this long after it started is closed automatically. */
+    public const MAX_VISIT_MINUTES = 240;
+
+    /** The patient may cancel or move a visit until this many minutes before it. */
+    public const PATIENT_CHANGE_CUTOFF_MINUTES = 60;
+
     public function canTransition(Appointment $appointment, string $to): bool
     {
-        return in_array($to, self::TRANSITIONS[$appointment->status] ?? [], true);
+        return in_array($to, self::TRANSITIONS[$appointment->status] ?? [], true)
+            && $this->timeProblem($appointment, $to) === null;
     }
 
     public function rejectionMessage(Appointment $appointment, string $to): string
     {
-        return "An appointment that is {$appointment->status} cannot be marked {$to}.";
+        if (! in_array($to, self::TRANSITIONS[$appointment->status] ?? [], true)) {
+            return "An appointment that is {$appointment->status} cannot be marked {$to}.";
+        }
+
+        return $this->timeProblem($appointment, $to) ?? '';
+    }
+
+    /** Whether the patient is still early enough to cancel or move this visit. */
+    public static function patientMayChange(Appointment $appointment): bool
+    {
+        return now()->lt($appointment->appointment_datetime->copy()
+            ->subMinutes(self::PATIENT_CHANGE_CUTOFF_MINUTES));
+    }
+
+    /** Why `$to` is not allowed at this moment, or null when the time is fine. */
+    private function timeProblem(Appointment $appointment, string $to): ?string
+    {
+        $start = $appointment->appointment_datetime;
+        if (! $start) {
+            return null;
+        }
+
+        $clock = fn ($time) => $time->copy()->setTimezone(DoctorSlotService::timezone())->format('g:i A');
+
+        return match ($to) {
+            'in_progress' => match (true) {
+                now()->lt($start->copy()->subMinutes(self::START_EARLY_MINUTES)) =>
+                    "This visit is at {$clock($start)}. It can be started from "
+                    .$clock($start->copy()->subMinutes(self::START_EARLY_MINUTES)).'.',
+                now()->gt($start->copy()->addMinutes(self::START_LATE_MINUTES)) =>
+                    'This visit can no longer be started: it was due at '.$clock($start).'.',
+                default => null,
+            },
+            'no_show' => now()->lt($start)
+                ? "A visit can be marked no-show only after its time ({$clock($start)})."
+                : null,
+            'expired' => now()->lte($start->copy()->addMinutes(self::START_LATE_MINUTES))
+                ? 'This visit can still be started.'
+                : null,
+            default => null,
+        };
     }
 
     /**

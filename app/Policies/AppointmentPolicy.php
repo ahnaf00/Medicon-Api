@@ -18,6 +18,12 @@ class AppointmentPolicy
         return $this->isParticipant($user, $appointment);
     }
 
+    /** Only the patient who booked it moves it to another time (audit F10). */
+    public function reschedule(User $user, Appointment $appointment): bool
+    {
+        return $user->id === (int) $appointment->patient_user_id;
+    }
+
     /** Only the appointment's own doctor moves it through the visit lifecycle. */
     public function updateStatus(User $user, Appointment $appointment): bool
     {

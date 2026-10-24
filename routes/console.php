@@ -4,10 +4,12 @@ use App\Models\Appointment;
 use App\Models\ConsultationTranscript;
 use App\Models\Prescription;
 use App\Models\User;
+use App\Services\AppointmentLifecycle;
 use App\Services\ConsultationTranscriptPipeline;
 use App\Services\DoctorSlotService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -120,6 +122,41 @@ Artisan::command('transcripts:finalize-stale', function (ConsultationTranscriptP
 
     return 0;
 })->purpose('Finalize transcripts left open after their visit ended');
+
+// Visits nobody started within the window expire; visits left "in progress"
+// far past their start are closed, which also finalizes their transcript (audit F10).
+Artisan::command('appointments:expire', function (AppointmentLifecycle $lifecycle) {
+    $expired = 0;
+    $closed = 0;
+
+    $due = Appointment::where(fn ($q) => $q
+        ->where(fn ($q) => $q->where('status', 'scheduled')
+            ->where('appointment_datetime', '<', now()->subMinutes(AppointmentLifecycle::START_LATE_MINUTES)))
+        ->orWhere(fn ($q) => $q->where('status', 'in_progress')
+            ->where(fn ($q) => $q->where('started_at', '<', now()->subMinutes(AppointmentLifecycle::MAX_VISIT_MINUTES))
+                ->orWhere(fn ($q) => $q->whereNull('started_at')
+                    ->where('appointment_datetime', '<', now()->subMinutes(AppointmentLifecycle::MAX_VISIT_MINUTES))))))
+        ->pluck('id');
+
+    foreach ($due as $id) {
+        // Re-read under a lock: the doctor may have just started or ended it.
+        DB::transaction(function () use ($id, $lifecycle, &$expired, &$closed) {
+            $appointment = Appointment::lockForUpdate()->find($id);
+            $to = $appointment?->status === 'scheduled' ? 'expired' : 'completed';
+
+            if ($appointment && $lifecycle->canTransition($appointment, $to)) {
+                $lifecycle->transition($appointment, $to);
+                $to === 'expired' ? $expired++ : $closed++;
+            }
+        });
+    }
+
+    $this->info("Expired {$expired} unstarted visit(s); closed {$closed} visit(s) left in progress.");
+
+    return 0;
+})->purpose('Expire visits nobody started and close visits left in progress');
+
+Schedule::command('appointments:expire')->everyFiveMinutes();
 
 Schedule::command('transcripts:finalize-stale')->hourly();
 

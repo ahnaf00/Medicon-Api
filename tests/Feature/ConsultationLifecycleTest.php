@@ -11,6 +11,8 @@ beforeEach(function () {
     $this->patient = makePatient();
     $this->doctor = makeDoctor();
     $this->appointment = bookAppointment($this->patient, $this->doctor);
+    // Due now, so the start window (audit F10) allows starting or a no-show.
+    $this->appointment->update(['appointment_datetime' => now()]);
 });
 
 function setStatus($user, $appointment, string $status)

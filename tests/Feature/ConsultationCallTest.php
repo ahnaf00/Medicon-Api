@@ -26,7 +26,8 @@ beforeEach(function () {
     $this->patient = makePatient();
     $this->doctor = makeDoctor();
     $this->appointment = bookAppointment($this->patient, $this->doctor);
-    $this->appointment->update(['format' => 'video']);
+    // Due now, so the start window (audit F10) allows starting it.
+    $this->appointment->update(['format' => 'video', 'appointment_datetime' => now()]);
 });
 
 function callApi($user, Appointment $appointment, string $action, array $body = [])

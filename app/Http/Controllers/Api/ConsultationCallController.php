@@ -111,6 +111,13 @@ class ConsultationCallController extends Controller
                 ], 409);
             }
 
+            // The doctor's first join starts the visit, so it keeps the start window (audit F10).
+            if ($appointment->status === 'scheduled' && ! $this->lifecycle->canTransition($appointment, 'in_progress')) {
+                return response()->json([
+                    'message' => $this->lifecycle->rejectionMessage($appointment, 'in_progress'),
+                ], 409);
+            }
+
             $transcript = $appointment->transcript()->firstOrCreate([]);
 
             // Mint before changing status so a misconfigured server never
