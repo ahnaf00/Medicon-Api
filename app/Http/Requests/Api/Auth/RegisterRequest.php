@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Api\Auth;
 
+use App\Services\SymptomTriageService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class RegisterRequest extends FormRequest
 {
@@ -26,7 +28,8 @@ class RegisterRequest extends FormRequest
             'registration_token' => ['required', 'string'],
 
             // Doctor-specific optional onboarding fields
-            'specialty' => ['required_if:role,doctor', 'nullable', 'string', 'max:255'],
+            // One of the departments patients browse and symptom search recommends from.
+            'specialty' => ['required_if:role,doctor', 'nullable', 'string', Rule::in(SymptomTriageService::SPECIALTIES)],
             'qualification' => ['required_if:role,doctor', 'nullable', 'string', 'max:255'],
             'consultation_fee' => ['nullable', 'numeric', 'min:0'],
 

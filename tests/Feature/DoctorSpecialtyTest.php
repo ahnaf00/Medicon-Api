@@ -36,3 +36,14 @@ it('filters doctors by specialty', function () {
 it('rejects an unknown specialty', function () {
     $this->getJson('/api/v1/doctors?specialty=Astrology')->assertUnprocessable();
 });
+
+it('only lets a doctor sign up with a listed specialty', function () {
+    $this->postJson('/api/v1/auth/register', [
+        'name' => 'Dr. Free Text',
+        'phone' => '+8801700000002',
+        'role' => 'doctor',
+        'registration_token' => verifyNewPhone('+8801700000002'),
+        'specialty' => 'Cardiologist',
+        'qualification' => 'MBBS',
+    ])->assertUnprocessable()->assertJsonValidationErrors('specialty');
+});
