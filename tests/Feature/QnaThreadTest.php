@@ -206,3 +206,26 @@ describe('asking a specific doctor (audit F5 / SEC-011)', function () {
         }
     });
 });
+
+describe('claiming a question (audit F6)', function () {
+    it('lets only one of two doctors answering at once claim it', function () {
+        $question = askQuestion($this);
+        $rival = makeDoctor('verified', 'Cardiology');
+
+        // The rival's claim lands just after this request has loaded the question.
+        Conversation::retrieved(function (Conversation $c) use ($question, $rival) {
+            static $done = false;
+            if (! $done && $c->id === $question->id) {
+                $done = true;
+                Conversation::whereKey($c->id)->update(['doctor_user_id' => $rival->id]);
+            }
+        });
+
+        $this->actingAs($this->doctor, 'sanctum')
+            ->postJson("/api/v1/conversations/{$question->id}/messages", ['body' => 'Please rest.'])
+            ->assertStatus(409);
+
+        expect($question->fresh()->doctor_user_id)->toBe($rival->id)
+            ->and($question->messages()->where('sender_user_id', $this->doctor->id)->exists())->toBeFalse();
+    });
+});

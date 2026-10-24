@@ -152,9 +152,19 @@ class ConversationController extends Controller
 
         Gate::authorize('reply', $conversation);
 
-        // If a doctor answers an unassigned question, they claim it
-        if ($conversation->patient_user_id !== $user->id && !$conversation->doctor_user_id) {
-            $conversation->update(['doctor_user_id' => $user->id]);
+        // A doctor answering an unassigned question claims it. The claim is one
+        // conditional update, so of two doctors answering at once only one wins (audit F6).
+        if ($conversation->patient_user_id !== $user->id && ! $conversation->doctor_user_id) {
+            Conversation::whereKey($conversation->id)
+                ->whereNull('doctor_user_id')
+                ->update(['doctor_user_id' => $user->id]);
+            $conversation->refresh();
+
+            if ((int) $conversation->doctor_user_id !== $user->id) {
+                return response()->json([
+                    'message' => 'Another doctor has already taken this question.',
+                ], 409);
+            }
         }
 
         $message = $conversation->messages()->create([
