@@ -69,8 +69,9 @@ it('refuses a number that is not a Bangladeshi mobile', function () {
 it('stores the +880 form when a user changes their number', function () {
     $patient = makePatient();
 
+    $this->actingAs($patient, 'sanctum')->postJson('/api/v1/user/me/phone/send-otp', ['phone' => '01911000003'])->assertOk();
     $this->actingAs($patient, 'sanctum')
-        ->putJson('/api/v1/user/me', ['phone' => '01911000003'])
+        ->postJson('/api/v1/user/me/phone/verify', ['phone' => '01911000003', 'otp' => '123456'])
         ->assertOk();
 
     expect($patient->fresh()->phone)->toBe('+8801911000003');

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AiChatController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\PhoneChangeController;
 use App\Http\Controllers\Api\ConsultationCallController;
 use App\Http\Controllers\Api\ConsultationChatController;
 use App\Http\Controllers\Api\ConsultationController;
@@ -70,6 +71,9 @@ Route::prefix('v1')->group(function () {
         // --- User Profile & Auth ---
         Route::get('/user/me', [AuthController::class, 'me']);
         Route::put('/user/me', [AuthController::class, 'updateProfile']);
+        // A new phone number needs a code sent to it (audit F12).
+        Route::post('/user/me/phone/send-otp', [PhoneChangeController::class, 'send'])->middleware('throttle:otp-send');
+        Route::post('/user/me/phone/verify', [PhoneChangeController::class, 'verify'])->middleware('throttle:otp-verify');
         Route::post('/user/avatar', [AuthController::class, 'uploadAvatar']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 

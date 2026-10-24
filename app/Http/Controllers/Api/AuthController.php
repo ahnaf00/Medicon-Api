@@ -11,8 +11,8 @@ use App\Http\Requests\Api\Auth\VerifyOtpRequest;
 use App\Http\Resources\UserResource;
 use App\Models\DoctorProfile;
 use App\Models\PatientProfile;
-use App\Models\PhoneOtp;
 use App\Models\User;
+use App\Services\PhoneOtpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -24,7 +24,18 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    private const DEMO_OTP = '123456';
+    public static function otpUnavailable(): JsonResponse
+    {
+        return response()->json(['message' => 'OTP delivery is not configured on this server.'], 503);
+    }
+
+    public static function otpSent(): JsonResponse
+    {
+        return response()->json([
+            'message' => 'Demo mode: no SMS is sent. Use the demo code '.PhoneOtpService::DEMO_OTP.'.',
+            'demo' => true,
+        ], 200);
+    }
 
     private static function registrationProofKey(string $phone): string
     {
@@ -101,58 +112,30 @@ class AuthController extends Controller
         ], 201);
     }
 
-    public function sendOtp(SendOtpRequest $request): JsonResponse
+    public function sendOtp(SendOtpRequest $request, PhoneOtpService $otps): JsonResponse
     {
-        $validated = $request->validated();
-        $phone = $validated['phone'];
-
         // No SMS provider is integrated, so a real code could never reach the
         // user. The only working mode is the explicit demo mode with a fixed code.
-        if (! config('services.otp.demo_mode')) {
-            return response()->json([
-                'message' => 'OTP delivery is not configured on this server.',
-            ], 503);
+        if (! $otps->canSend()) {
+            return self::otpUnavailable();
         }
 
-        $otp = self::DEMO_OTP;
+        $otps->issue($request->validated('phone'));
 
-        PhoneOtp::updateOrCreate(
-            ['phone' => $phone],
-            [
-                'otp' => Hash::make($otp),
-                'attempts' => 0,
-                'expires_at' => now()->addMinutes(5)
-            ]
-        );
-
-        return response()->json([
-            'message' => 'Demo mode: no SMS is sent. Use the demo code '.self::DEMO_OTP.'.',
-            'demo' => true,
-        ], 200);
+        return self::otpSent();
     }
 
-    public function verifyOtp(VerifyOtpRequest $request): JsonResponse
+    public function verifyOtp(VerifyOtpRequest $request, PhoneOtpService $otps): JsonResponse
     {
         $validated = $request->validated();
         $phone = $validated['phone'];
 
-        $otpRecord = PhoneOtp::where('phone', $phone)->first();
+        $result = $otps->check($phone, $validated['otp']);
+        if ($result !== PhoneOtpService::OK) {
+            [$message, $status] = PhoneOtpService::failure($result);
 
-        if (!$otpRecord || now()->greaterThan($otpRecord->expires_at)) {
-            return response()->json(['message' => 'OTP expired or invalid.'], 400);
+            return response()->json(['message' => $message], $status);
         }
-
-        if ($otpRecord->attempts >= 3) {
-            $otpRecord->delete();
-            return response()->json(['message' => 'Max attempts reached. Request a new OTP.'], 429);
-        }
-
-        if (!Hash::check($validated['otp'], $otpRecord->otp)) {
-            $otpRecord->increment('attempts');
-            return response()->json(['message' => 'Invalid OTP.'], 400);
-        }
-
-        $otpRecord->delete();
 
         $user = User::where('phone', $phone)->first();
 

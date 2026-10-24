@@ -33,7 +33,13 @@ class UpdateProfileRequest extends FormRequest
         $rules = [
             // User fields
             'name'  => ['sometimes', 'string', 'max:255'],
-            'phone' => ['sometimes', 'string', 'max:20', ...self::phoneRule(), 'unique:users,phone,' . $user->id],
+            // The login number changes only with a code sent to the new number
+            // (POST /user/me/phone/..., audit F12); the current one may be resent.
+            'phone' => ['sometimes', 'string', function (string $attribute, mixed $value, \Closure $fail) use ($user) {
+                if ($value !== $user->phone) {
+                    $fail('To change your phone number, confirm it with a code sent to the new number.');
+                }
+            }],
         ];
         // Patient-specific fields
         if ($user->hasRole('patient')) {
