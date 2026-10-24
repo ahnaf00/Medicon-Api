@@ -112,6 +112,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware('throttle:ai');
             Route::post('/prescriptions', [PrescriptionController::class, 'store']);
             Route::patch('/prescriptions/{id}/items/{itemId}/explanation', [PrescriptionController::class, 'updateExplanation']);
+            // Cancel a prescription written in error (audit G1); PrescriptionPolicy::void.
+            Route::post('/prescriptions/{id}/void', [PrescriptionController::class, 'void']);
             Route::get('/patients', [PatientController::class, 'index']);
             Route::get('/patients/{id}', [PatientController::class, 'show']);
 

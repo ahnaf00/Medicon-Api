@@ -8,6 +8,7 @@ use App\Http\Resources\PrescriptionDocumentResource;
 use App\Http\Resources\PrescriptionResource;
 use App\Models\Prescription;
 use App\Http\Requests\Api\Prescriptions\UpdateExplanationRequest;
+use App\Services\AllergyCheck;
 use App\Services\MedicineExplainerService;
 use App\Services\PrescriptionPdfService;
 use App\Models\User;
@@ -24,11 +25,16 @@ use function Illuminate\Support\defer;
 
 class PrescriptionController extends Controller
 {
+    /** Everything PrescriptionResource reads, loaded up front. */
+    private const RELATIONS = ['items', 'tests', 'doctor.doctorProfile', 'patient.patientProfile', 'replacedBy:id,replaces_prescription_id'];
+
+    public const ALLERGY_WARNING = 'A medicine matches an allergy on the patient\'s profile. Check it, then confirm to prescribe anyway.';
+
     public function index(Request $request):AnonymousResourceCollection
     {
         $user = $request->user();
 
-        $prescriptions = Prescription::with(['items', 'tests', 'doctor.doctorProfile', 'patient.patientProfile'])->latest();
+        $prescriptions = Prescription::with(self::RELATIONS)->latest();
 
         if($user->hasRole('doctor'))
         {
@@ -46,11 +52,44 @@ class PrescriptionController extends Controller
         $validated = $request->validated();
         $doctor = $request->user();
 
+        // Reissue after cancelling (audit G1): the replacement belongs to the same
+        // doctor, patient and visit as the cancelled one, and replaces it once.
+        if (! empty($validated['replaces_prescription_id'])) {
+            $replaced = Prescription::findOrFail($validated['replaces_prescription_id']);
+            $sameVisit = ($validated['appointment_id'] ?? $replaced->voided_appointment_id) == $replaced->voided_appointment_id;
+            if ((int) $replaced->doctor_user_id !== $doctor->id
+                || (int) $replaced->patient_user_id !== (int) $validated['patient_user_id']
+                || $replaced->status !== 'cancelled'
+                || ! $sameVisit
+                || $replaced->replacedBy()->exists()) {
+                throw ValidationException::withMessages([
+                    'replaces_prescription_id' => ['Only a cancelled prescription of yours, for this patient and visit, can be replaced, and only once.'],
+                ]);
+            }
+            $validated['appointment_id'] ??= $replaced->voided_appointment_id;
+        }
+
         Gate::authorize('create', [
             Prescription::class,
             (int) $validated['patient_user_id'],
             isset($validated['appointment_id']) ? (int) $validated['appointment_id'] : null,
         ]);
+
+        // Name match against the patient's recorded allergies (audit G1). Not a
+        // drug-class check: the app says so next to the warning.
+        $patient = User::with('patientProfile')->find($validated['patient_user_id']);
+        $conflicts = AllergyCheck::conflicts(
+            $patient?->patientProfile?->allergies,
+            array_column($validated['medicines'], 'medicine_name'),
+        );
+        if ($conflicts !== [] && ! ($validated['allergy_acknowledged'] ?? false)) {
+            return response()->json([
+                'message'           => self::ALLERGY_WARNING,
+                'errors'            => ['allergy_acknowledged' => [self::ALLERGY_WARNING]],
+                'allergyConflicts'  => $conflicts,
+            ], 422);
+        }
+        $validated['allergy_conflicts'] = $conflicts ?: null;
 
         try {
             $prescription = $this->createPrescription($validated, $doctor);
@@ -83,12 +122,17 @@ class PrescriptionController extends Controller
                 'follow_up_date'        => $validated['follow_up_date'] ?? null,
                 'advice'                => $validated['advice'] ?? null,
                 'status'                => 'active',
+                'replaces_prescription_id' => $validated['replaces_prescription_id'] ?? null,
+                'allergy_conflicts'     => $validated['allergy_conflicts'],
+                'allergy_acknowledged_at' => $validated['allergy_conflicts'] ? now() : null,
             ]);
             foreach ($validated['medicines'] as $med) {
                 $prescription->items()->create([
                     'medicine_name'     => $med['medicine_name'],
                     'dosage'            => $med['dosage'],
                     'dosage_schedule'   => $med['dosage_schedule'] ?? null,
+                    'dose_quantities'   => array_filter($med['dose_quantities'] ?? [], fn ($q) => $q !== null) ?: null,
+                    'route'             => $med['route'] ?? null,
                     'instructions'      => $med['instructions'] ?? null,
                     'duration_days'     => $med['duration_days'],
                 ]);
@@ -102,6 +146,39 @@ class PrescriptionController extends Controller
             }
             return $prescription;
         });
+    }
+
+    /**
+     * POST /prescriptions/{id}/void: the prescribing doctor cancels a prescription
+     * written in error, with a reason (audit G1). It stays in both histories marked
+     * cancelled, and the visit is freed so a corrected one can be issued.
+     */
+    public function void(Request $request, $id): PrescriptionResource
+    {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+
+        $prescription = Prescription::findOrFail($id);
+        Gate::authorize('void', $prescription);
+
+        DB::transaction(function () use ($id, $validated, $request) {
+            $prescription = Prescription::lockForUpdate()->findOrFail($id);
+            if ($prescription->status === 'cancelled') {
+                throw ValidationException::withMessages(['reason' => ['This prescription is already cancelled.']]);
+            }
+
+            $prescription->forceFill([
+                'status'                => 'cancelled',
+                'voided_at'             => now(),
+                'void_reason'           => trim($validated['reason']),
+                'voided_by_user_id'     => $request->user()->id,
+                'voided_appointment_id' => $prescription->appointment_id,
+                'appointment_id'        => null,
+            ])->save();
+        });
+
+        return new PrescriptionResource($this->findViewable($id));
     }
 
     public function show(Request $request, $id): PrescriptionResource
@@ -159,7 +236,7 @@ class PrescriptionController extends Controller
 
     private function findViewable($id): Prescription
     {
-        $prescription = Prescription::with(['items', 'tests', 'doctor.doctorProfile', 'patient.patientProfile'])->findOrFail($id);
+        $prescription = Prescription::with(self::RELATIONS)->findOrFail($id);
 
         // Only the prescription's patient or prescribing doctor may read it.
         Gate::authorize('view', $prescription);

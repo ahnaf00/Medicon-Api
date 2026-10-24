@@ -30,6 +30,10 @@ class PrescriptionDocumentResource extends JsonResource
             'issuedAt'          => $this->created_at?->toIso8601String(),
             'issuedDate'        => $issuedAt?->format('M j, Y'),
             'diagnosisSummary'  => $this->diagnosis_summary,
+            // A cancelled prescription must never pass for a valid one (audit G1).
+            'status'            => $this->status,
+            'voidReason'        => $this->void_reason,
+            'voidedDate'        => $this->voided_at?->copy()->setTimezone(self::DISPLAY_TIMEZONE)->format('M j, Y'),
             'doctor' => [
                 'name'                  => $this->doctor?->name,
                 'qualification'         => $doctorProfile?->qualification,
@@ -51,7 +55,8 @@ class PrescriptionDocumentResource extends JsonResource
                 'id'            => $item->id,
                 'name'          => $item->medicine_name,
                 'dosage'        => $item->dosage,
-                'pattern'       => self::dosePattern($item->dosage_schedule),
+                'pattern'       => self::dosePattern($item->dosage_schedule, $item->dose_quantities),
+                'route'         => $item->route,
                 'durationDays'  => $item->duration_days,
                 'instructions'  => $item->instructions,
             ])->values(),
@@ -77,18 +82,62 @@ class PrescriptionDocumentResource extends JsonResource
     }
 
     /**
-     * `morning`/`noon`/`night` schedule → `1+0+1`. Null when no schedule was given.
+     * `morning`/`noon`/`night` schedule → `1+0+1`, or with amounts `2+0+1` / `½+0+½`.
+     * A scheduled slot without an amount counts as 1 (older prescriptions).
+     * Null when no schedule was given.
      *
      * @param  array<string, mixed>|null  $schedule
+     * @param  array<string, mixed>|null  $quantities
      */
-    public static function dosePattern(?array $schedule): ?string
+    public static function dosePattern(?array $schedule, ?array $quantities = null): ?string
     {
         if (empty($schedule)) {
             return null;
         }
 
         return collect(['morning', 'noon', 'night'])
-            ->map(fn (string $slot) => empty($schedule[$slot]) ? '0' : '1')
+            ->map(fn (string $slot) => empty($schedule[$slot])
+                ? '0'
+                : self::formatAmount($quantities[$slot] ?? 1))
             ->implode('+');
+    }
+
+    /** How a route reads on paper and in the app. */
+    public const ROUTE_LABELS = [
+        'oral' => 'By mouth',
+        'sublingual' => 'Under the tongue',
+        'topical' => 'On the skin',
+        'inhaled' => 'Inhaled',
+        'nasal' => 'In the nose',
+        'eye' => 'In the eye',
+        'ear' => 'In the ear',
+        'injection' => 'Injection',
+        'rectal' => 'Rectal',
+        'vaginal' => 'Vaginal',
+        'other' => 'Other route',
+    ];
+
+    public static function routeLabel(?string $route): ?string
+    {
+        return $route === null ? null : (self::ROUTE_LABELS[$route] ?? $route);
+    }
+
+    /** 1 → "1", 0.5 → "½", 1.5 → "1½", 0.25 → "¼", 0.75 → "¾". */
+    public static function formatAmount(float|int|string $amount): string
+    {
+        $amount = (float) $amount;
+        $whole = (int) floor($amount);
+        $fraction = match ((int) round(($amount - $whole) * 100)) {
+            25 => '¼',
+            50 => '½',
+            75 => '¾',
+            default => '',
+        };
+
+        if ($fraction === '') {
+            return rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
+        }
+
+        return ($whole > 0 ? (string) $whole : '').$fraction;
     }
 }

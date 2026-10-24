@@ -25,6 +25,10 @@ class PrescriptionItemResource extends JsonResource
             'dosage'            => $this->dosage,
             'scheduleFormat'    => is_array($this->dosage_schedule) ? implode('/', array_keys(array_filter($this->dosage_schedule))) : null,
             'dosageSchedule'    => $this->dosage_schedule,
+            // Units per time of day, e.g. {morning: 2, night: 1}; null on older prescriptions.
+            'doseQuantities'    => $this->dose_quantities,
+            'route'             => $this->route,
+            'dosePattern'       => PrescriptionDocumentResource::dosePattern($this->dosage_schedule, $this->dose_quantities),
             'instructions'      => $this->instructions,
             'durationDays'      => $this->duration_days,
             'explanation'       => $showExplanation ? $this->explanation : null,

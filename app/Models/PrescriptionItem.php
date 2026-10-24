@@ -15,6 +15,8 @@ class PrescriptionItem extends Model
         'medicine_name',
         'dosage',
         'dosage_schedule',
+        'dose_quantities',
+        'route',
         'instructions',
         'duration_days',
         'explanation',
@@ -23,6 +25,7 @@ class PrescriptionItem extends Model
     ];
     protected $casts = [
         'dosage_schedule' => 'array', // Automatically casts JSON string to PHP array
+        'dose_quantities' => 'array',
         'duration_days' => 'integer',
         'explanation_hidden' => 'boolean',
     ];

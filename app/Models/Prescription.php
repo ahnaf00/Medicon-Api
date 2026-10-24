@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Prescription extends Model
@@ -19,11 +20,23 @@ class Prescription extends Model
         'follow_up_date',
         'advice',
         'status',
+        'replaces_prescription_id',
+        'allergy_conflicts',
+        'allergy_acknowledged_at',
     ];
 
     protected $casts = [
         'follow_up_date' => 'date',
+        'voided_at' => 'datetime',
+        'allergy_conflicts' => 'array',
+        'allergy_acknowledged_at' => 'datetime',
     ];
+
+    /** The prescription issued to replace this one after it was cancelled. */
+    public function replacedBy(): HasOne
+    {
+        return $this->hasOne(Prescription::class, 'replaces_prescription_id');
+    }
 
     public function appointment():BelongsTo
     {

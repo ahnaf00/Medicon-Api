@@ -28,9 +28,16 @@
     .footer { margin-top: 18px; }
     .signature { width: 200px; margin-left: auto; margin-top: 46px; text-align: center; }
     .signature-line { border-top: 1px solid #1f2937; padding-top: 4px; }
+    .cancelled { border: 2px solid #b91c1c; color: #b91c1c; padding: 8px 10px; margin-bottom: 10px; font-weight: bold; }
 </style>
 </head>
 <body>
+    @if (($doc['status'] ?? null) === 'cancelled')
+        <div class="cancelled">
+            CANCELLED by the prescribing doctor{{ $doc['voidedDate'] ? ' on '.$doc['voidedDate'] : '' }}. Do not use this prescription.
+            @if ($doc['voidReason'])<div style="font-weight: normal;">Reason: {{ $doc['voidReason'] }}</div>@endif
+        </div>
+    @endif
     <table class="header">
         <tr>
             <td>
@@ -77,6 +84,7 @@
                         <div class="med-name">{{ $i + 1 }}. {{ $med['name'] }} {{ $med['dosage'] }}</div>
                         <div>
                             {{ $med['pattern'] ?? 'As directed' }}
+                            @if (! empty($med['route'])) &nbsp;·&nbsp; {{ \App\Http\Resources\PrescriptionDocumentResource::routeLabel($med['route']) }}@endif
                             &nbsp;·&nbsp; {{ $med['durationDays'] }} {{ $med['durationDays'] === 1 ? 'day' : 'days' }}
                             @if ($med['instructions']) &nbsp;·&nbsp; {{ $med['instructions'] }}@endif
                         </div>

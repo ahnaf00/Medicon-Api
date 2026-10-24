@@ -21,6 +21,13 @@ class PrescriptionResource extends JsonResource
             'followUpDate'      => $this->follow_up_date?->format('Y-m-d'),
             'advice'            => $this->advice,
             'status'            => $this->status,
+            // Cancelled by the prescribing doctor (audit G1).
+            'voidedAt'          => $this->voided_at?->toIso8601String(),
+            'voidReason'        => $this->void_reason,
+            'replacesPrescriptionId' => $this->replaces_prescription_id,
+            'replacedByPrescriptionId' => $this->whenLoaded('replacedBy', fn () => $this->replacedBy?->id),
+            // Medicines that matched the patient's recorded allergies, confirmed by the doctor.
+            'allergyConflicts'  => $this->allergy_conflicts ?? [],
             'doctor'            => new UserResource($this->whenLoaded('doctor')),
             'patient'           => new UserResource($this->whenLoaded('patient')),
             'medicines'         => $this->whenLoaded('items', fn () => PrescriptionItemResource::collection(

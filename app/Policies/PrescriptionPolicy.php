@@ -21,6 +21,12 @@ class PrescriptionPolicy
         return $user->isVerifiedDoctor() && $user->id === (int) $prescription->doctor_user_id;
     }
 
+    /** Only the prescribing doctor cancels a prescription written in error (audit G1). */
+    public function void(User $user, Prescription $prescription): bool
+    {
+        return $user->isVerifiedDoctor() && $user->id === (int) $prescription->doctor_user_id;
+    }
+
     /** A visit that has actually taken place (or is taking place) — the only basis for a prescription. */
     public const PRESCRIBABLE_VISIT_STATUSES = ['in_progress', 'completed'];
 
