@@ -39,8 +39,8 @@ Route::prefix('v1')->group(function () {
     // =====================================================================
 
     Route::prefix('auth')->middleware('throttle:6,1')->group(function () {
-        Route::post('/send-otp', [AuthController::class, 'sendOtp']);
-        Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
+        Route::post('/send-otp', [AuthController::class, 'sendOtp'])->middleware('throttle:otp-send');
+        Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
     });
