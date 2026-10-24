@@ -64,6 +64,8 @@ return [
         'secret' => env('TRANSCRIBER_SECRET'),
         // How late the agent may learn of a consent change (see
         // ConsultationTranscript::consentHeldThroughout). 0 = exact.
+        // The app's consent text (call.consent_body, en + bn) tells users "about
+        // 2 seconds"; change it there too if this changes (audit REC-002).
         'consent_grace_ms' => (int) env('TRANSCRIBER_CONSENT_GRACE_MS', 2000),
         // After the doctor ends a call, wait this long for the agent's uploads
         // and /complete before finalising anyway (agent not running or crashed).
