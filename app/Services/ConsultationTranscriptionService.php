@@ -27,7 +27,6 @@ use Throwable;
  */
 class ConsultationTranscriptionService
 {
-    private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
     /** Base64 inflates by a third; Gemini rejects inline requests above ~20 MB. */
     private const MAX_INLINE_BYTES = 14 * 1024 * 1024;
@@ -158,7 +157,7 @@ PROMPT;
             // One more attempt for a dropped connection, a rate limit or a 5xx.
             ->retry(2, 2000, fn (Throwable $e) => $e instanceof ConnectionException
                 || ($e instanceof RequestException && ($e->response->serverError() || $e->response->status() === 429)), throw: false)
-            ->post(self::ENDPOINT, [
+            ->post(GeminiEndpoint::generate(), [
                 'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT]]],
                 'contents' => [['parts' => [
                     ['inline_data' => ['mime_type' => 'audio/flac', 'data' => base64_encode($audio)]],

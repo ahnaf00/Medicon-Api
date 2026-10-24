@@ -22,7 +22,6 @@ use Throwable;
  */
 class SymptomTriageService
 {
-    private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
     /** Must match the doctor categories the app offers (doctorsService.getCategories). */
     public const SPECIALTIES = [
@@ -229,7 +228,7 @@ PROMPT;
         try {
             $response = Http::timeout(15)
                 ->withHeaders(['x-goog-api-key' => $apiKey])
-                ->post(self::ENDPOINT, [
+                ->post(GeminiEndpoint::generate(), [
                     'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT]]],
                     'contents' => [['parts' => [['text' => $query]]]],
                     'generationConfig' => [

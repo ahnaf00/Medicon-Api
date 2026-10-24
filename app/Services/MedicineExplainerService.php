@@ -18,7 +18,6 @@ use Throwable;
  */
 class MedicineExplainerService
 {
-    private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
     private const SYSTEM_PROMPT = <<<'PROMPT'
 You explain a prescribed medicine to a patient in Bangladesh in plain, friendly English.
@@ -72,7 +71,7 @@ PROMPT;
         try {
             $response = Http::timeout(15)
                 ->withHeaders(['x-goog-api-key' => $apiKey])
-                ->post(self::ENDPOINT, [
+                ->post(GeminiEndpoint::generate(), [
                     'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT]]],
                     'contents' => [[
                         'parts' => [['text' => "Medicine: {$item->medicine_name}\nStrength: {$item->dosage}"]],

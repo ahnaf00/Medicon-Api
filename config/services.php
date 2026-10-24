@@ -35,8 +35,12 @@ return [
         ],
     ],
 
+    // One pinned model for every AI feature (audit CLIN-012). A floating alias
+    // such as gemini-flash-latest can change behaviour or slow down without a
+    // release; switch models here or with GEMINI_MODEL.
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
     ],
 
     // Phone login has no SMS provider. Demo mode accepts the fixed code 123456

@@ -20,7 +20,6 @@ use Throwable;
  */
 class TranscriptSummaryService
 {
-    private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
     /** Roughly a two-hour conversation; longer transcripts keep their start. */
     private const MAX_TRANSCRIPT_CHARS = 200_000;
@@ -84,7 +83,7 @@ PROMPT;
             ->withHeaders(['x-goog-api-key' => $apiKey])
             ->retry(2, 2000, fn (Throwable $e) => $e instanceof ConnectionException
                 || ($e instanceof RequestException && ($e->response->serverError() || $e->response->status() === 429)), throw: false)
-            ->post(self::ENDPOINT, [
+            ->post(GeminiEndpoint::generate(), [
                 'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT]]],
                 'contents' => [['parts' => [['text' => "TRANSCRIPT\n".$text]]]],
                 'generationConfig' => [

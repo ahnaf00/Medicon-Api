@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\AiChatMessageResource;
 use App\Http\Resources\AiChatSessionResource;
 use App\Models\AiChatSession;
+use App\Services\GeminiEndpoint;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -64,7 +65,10 @@ class AiChatController extends Controller
         try {
             $apiKey = config('services.gemini.api_key');
 
-            $response = Http::timeout(15)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={$apiKey}", [
+            // Key in the header, never in the URL, so it cannot reach logs (audit SEC-007).
+            $response = Http::timeout(15)
+                ->withHeaders(['x-goog-api-key' => $apiKey])
+                ->post(GeminiEndpoint::generate(), [
                 'system_instruction' => [
                     'parts' => [
                         ['text' => 'You are MediCon AI, a friendly and helpful health assistant for the MediCon patient app. You help patients understand symptoms, explain medical terms in simple language, and provide general health guidance. Always remind users that your advice is not a substitute for professional medical consultation. Keep responses concise (under 200 words). If the situation sounds urgent or life-threatening, strongly advise them to call emergency services or use the Emergency SOS feature in the app.']
@@ -84,10 +88,11 @@ class AiChatController extends Controller
                 return $data['candidates'][0]['content']['parts'][0]['text'] ?? 'Sorry, I could not understand the response.';
             }
 
-            Log::error('Gemini API Error: ' . $response->body());
+            // Status only: the body and exception text can echo request details.
+            Log::error('AI chat: Gemini returned HTTP '.$response->status());
             return 'I am currently experiencing technical difficulties. Please try again later.';
         } catch (\Exception $e) {
-            Log::error('Gemini API Exception: ' . $e->getMessage());
+            Log::error('AI chat: Gemini request failed ('.class_basename($e).')');
             return 'I am currently experiencing technical difficulties. Please try again later.';
         }
     }
