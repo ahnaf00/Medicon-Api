@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\MedicineController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PrescriptionController;
+use App\Http\Controllers\Api\PrescriptionUploadController;
 use App\Http\Controllers\Api\SymptomSearchController;
 use App\Http\Controllers\Api\VitalController;
 use App\Http\Controllers\Api\DoctorDashboardController;
@@ -90,6 +91,12 @@ Route::prefix('v1')->group(function () {
         // --- Patient-Restricted Routes ---
         Route::middleware('role:patient')->group(function () {
             Route::post('/appointments', [AppointmentController::class, 'store']);
+
+            // Paper prescriptions the patient uploads (task 1.7); owner-only via PrescriptionUploadPolicy.
+            Route::get('/prescription-uploads', [PrescriptionUploadController::class, 'index']);
+            Route::post('/prescription-uploads', [PrescriptionUploadController::class, 'store']);
+            Route::get('/prescription-uploads/{id}', [PrescriptionUploadController::class, 'show'])->whereNumber('id');
+            Route::delete('/prescription-uploads/{id}', [PrescriptionUploadController::class, 'destroy'])->whereNumber('id');
         });
 
         // --- Doctor-Restricted Routes ---
