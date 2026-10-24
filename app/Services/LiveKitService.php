@@ -21,7 +21,11 @@ use RuntimeException;
  */
 class LiveKitService
 {
-    private const TOKEN_TTL_SECONDS = 2 * 60 * 60;
+    /**
+     * Only long enough to join (audit SEC-014). Once connected, the LiveKit server
+     * keeps refreshing the token, so calls and reconnects outlive this.
+     */
+    private const TOKEN_TTL_SECONDS = 10 * 60;
 
     private const ADMIN_TOKEN_TTL_SECONDS = 60;
 

@@ -34,7 +34,7 @@ it('mints a participant token scoped to the appointment room', function () {
     expect($claims['iss'])->toBe('devkey')
         ->and($claims['sub'])->toBe('user-17')
         ->and($claims['name'])->toBe('Dr. Rahman')
-        ->and($claims['exp'] - $claims['nbf'])->toBe(2 * 60 * 60)
+        ->and($claims['exp'] - $claims['nbf'])->toBe(10 * 60)
         ->and($claims['video'])->toBe([
             'room' => 'appointment-42',
             'roomJoin' => true,
