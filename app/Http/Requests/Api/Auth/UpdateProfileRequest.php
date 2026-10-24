@@ -3,14 +3,17 @@
 namespace App\Http\Requests\Api\Auth;
 
 use App\Services\SymptomTriageService;
+use App\Http\Requests\Api\Auth\Concerns\NormalizesPhone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UpdateProfileRequest extends FormRequest
 {
+    use NormalizesPhone;
+
     public function messages(): array
     {
-        return [
+        return $this->phoneMessages() + [
             'bmdc_registration_no.prohibited' => 'Your BMDC registration number was verified and cannot be changed here. Contact MediCon support.',
             'bmdc_registration_no.regex' => 'Enter your BMDC registration number, e.g. A-12345.',
         ];
@@ -30,7 +33,7 @@ class UpdateProfileRequest extends FormRequest
         $rules = [
             // User fields
             'name'  => ['sometimes', 'string', 'max:255'],
-            'phone' => ['sometimes', 'string', 'max:20', 'unique:users,phone,' . $user->id],
+            'phone' => ['sometimes', 'string', 'max:20', ...self::phoneRule(), 'unique:users,phone,' . $user->id],
         ];
         // Patient-specific fields
         if ($user->hasRole('patient')) {

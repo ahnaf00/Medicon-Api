@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\PhoneNumber;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -47,9 +48,14 @@ class AppServiceProvider extends ServiceProvider
         });
     }
 
-    /** The phone's digits only, so "+880 1711-000001" and "8801711000001" share a limit. */
+    /** The stored +880 form, so "01711000001" and "+880 1711-000001" share a limit. */
     private static function phoneKey(Request $request): string
     {
+        $phone = PhoneNumber::normalize($request->input('phone'));
+        if ($phone !== null) {
+            return $phone;
+        }
+
         $digits = preg_replace('/\D+/', '', (string) $request->input('phone'));
 
         return $digits !== '' ? $digits : 'ip:'.$request->ip();

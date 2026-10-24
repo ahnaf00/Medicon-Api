@@ -3,11 +3,14 @@
 namespace App\Http\Requests\Api\Auth;
 
 use App\Services\SymptomTriageService;
+use App\Http\Requests\Api\Auth\Concerns\NormalizesPhone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class RegisterRequest extends FormRequest
 {
+    use NormalizesPhone;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -18,7 +21,7 @@ class RegisterRequest extends FormRequest
 
     public function messages(): array
     {
-        return [
+        return $this->phoneMessages() + [
             'bmdc_registration_no.required_if' => 'Enter your BMDC registration number.',
             'bmdc_registration_no.regex' => 'Enter your BMDC registration number, e.g. A-12345.',
         ];
@@ -29,7 +32,7 @@ class RegisterRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['required', 'string', 'max:20', 'unique:users,phone'],
+            'phone' => ['required', 'string', 'max:20', ...self::phoneRule(), 'unique:users,phone'],
             'password' => ['nullable', 'string', 'min:6'],
             'role' => ['required', 'string', 'in:patient,doctor'],
             // Issued by POST /auth/verify-otp for a phone with no account yet.

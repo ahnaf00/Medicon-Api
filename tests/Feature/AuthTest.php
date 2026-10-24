@@ -47,7 +47,7 @@ it('refuses to send an OTP when demo mode is off, because nothing can deliver it
 
 it('logs an existing user in with the demo code', function () {
     $patient = makePatient();
-    $patient->update(['phone' => '01700000002']);
+    $patient->update(['phone' => '+8801700000002']);
 
     $this->postJson('/api/v1/auth/send-otp', ['phone' => '01700000002'])->assertOk();
 
@@ -64,7 +64,7 @@ it('rejects registration without an OTP proof', function () {
         ->assertStatus(422)
         ->assertJsonValidationErrors('registration_token');
 
-    expect(User::where('phone', '01700000003')->exists())->toBeFalse();
+    expect(User::where('phone', '+8801700000003')->exists())->toBeFalse();
 });
 
 it('rejects registration with a made-up proof', function () {
@@ -95,7 +95,7 @@ it('consumes the proof, so it cannot be used twice', function () {
     $proof = verifyNewPhone('01700000003');
     $this->postJson('/api/v1/auth/register', patientPayload('01700000003', $proof))->assertCreated();
 
-    User::where('phone', '01700000003')->delete();
+    User::where('phone', '+8801700000003')->delete();
 
     $this->postJson('/api/v1/auth/register', patientPayload('01700000003', $proof))
         ->assertStatus(422)
