@@ -85,3 +85,30 @@ it('rejects a test without a name', function () {
         ->assertUnprocessable()
         ->assertJsonValidationErrors('tests.0.name');
 });
+
+// Audit G1: one prescription per visit.
+it('refuses a second prescription for the same visit', function () {
+    $payload = fullPrescriptionPayload($this->patient->id, $this->appointment->id);
+
+    $this->actingAs($this->doctor, 'sanctum')->postJson('/api/v1/prescriptions', $payload)->assertCreated();
+    $this->actingAs($this->doctor, 'sanctum')
+        ->postJson('/api/v1/prescriptions', $payload)
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.appointment_id.0', 'This visit already has a prescription. Open it from the patient\'s prescriptions.');
+
+    expect(Prescription::count())->toBe(1);
+});
+
+it('blocks a duplicate in the database even if validation is bypassed', function () {
+    $attributes = [
+        'appointment_id' => $this->appointment->id,
+        'patient_user_id' => $this->patient->id,
+        'doctor_user_id' => $this->doctor->id,
+        'diagnosis_summary' => 'Viral fever',
+        'status' => 'active',
+    ];
+    Prescription::create($attributes);
+
+    expect(fn () => Prescription::create($attributes))
+        ->toThrow(\Illuminate\Database\UniqueConstraintViolationException::class);
+});

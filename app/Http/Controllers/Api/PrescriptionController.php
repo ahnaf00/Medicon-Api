@@ -10,12 +10,15 @@ use App\Models\Prescription;
 use App\Http\Requests\Api\Prescriptions\UpdateExplanationRequest;
 use App\Services\MedicineExplainerService;
 use App\Services\PrescriptionPdfService;
+use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 use function Illuminate\Support\defer;
 
@@ -49,7 +52,29 @@ class PrescriptionController extends Controller
             isset($validated['appointment_id']) ? (int) $validated['appointment_id'] : null,
         ]);
 
-        $prescription = DB::transaction(function () use ($validated, $doctor) {
+        try {
+            $prescription = $this->createPrescription($validated, $doctor);
+        } catch (UniqueConstraintViolationException) {
+            // Two saves for the same visit at once: the validation rule passed for
+            // both, the unique index stopped the second (audit G1).
+            throw ValidationException::withMessages([
+                'appointment_id' => [StorePrescriptionRequest::ONE_PER_VISIT],
+            ]);
+        }
+
+        // Write the "Why take this medicine?" text after the response is sent,
+        // so the doctor never waits on the model.
+        defer(fn () => $explainer->explainPrescription($prescription));
+
+        return response()->json([
+            'message'       => 'Prescription issued successfully.',
+            'prescription'  => $prescription->load(['items', 'tests']),
+        ], 201);
+    }
+
+    private function createPrescription(array $validated, User $doctor): Prescription
+    {
+        return DB::transaction(function () use ($validated, $doctor) {
             $prescription = Prescription::create([
                 'appointment_id'        => $validated['appointment_id'] ?? null,
                 'patient_user_id'       => $validated['patient_user_id'],
@@ -77,15 +102,6 @@ class PrescriptionController extends Controller
             }
             return $prescription;
         });
-
-        // Write the "Why take this medicine?" text after the response is sent,
-        // so the doctor never waits on the model.
-        defer(fn () => $explainer->explainPrescription($prescription));
-
-        return response()->json([
-            'message'       => 'Prescription issued successfully.',
-            'prescription'  => $prescription->load(['items', 'tests']),
-        ], 201);
     }
 
     public function show(Request $request, $id): PrescriptionResource
