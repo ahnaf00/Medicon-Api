@@ -8,6 +8,7 @@ use App\Services\AppointmentLifecycle;
 use App\Services\ConsultationTranscriptPipeline;
 use App\Services\DoctorSlotService;
 use App\Services\InAppNotifier;
+use App\Support\PhoneNumber;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,31 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// There is no admin UI yet; this is how a self-registered (pending) doctor is approved.
+// Admins are made only from the server, never by sign-up (audit L2). The account
+// is admin-only, so it signs in with OTP and lands on the admin screens.
+Artisan::command('admin:make {phone : Bangladeshi mobile number} {name : Display name}', function (string $phone, string $name) {
+    $normalized = PhoneNumber::normalize($phone);
+    if (! $normalized) {
+        $this->error("[{$phone}] is not a Bangladeshi mobile number.");
+
+        return 1;
+    }
+
+    $existing = User::where('phone', $normalized)->first();
+    if ($existing && ! $existing->hasRole('admin')) {
+        $this->error("{$normalized} already belongs to {$existing->name} (#{$existing->id}). Use a separate number for the admin account.");
+
+        return 1;
+    }
+
+    $admin = $existing ?? User::create(['name' => $name, 'phone' => $normalized, 'status' => 'active']);
+    $admin->assignRole('admin');
+    $this->info("Admin #{$admin->id} {$admin->name} ({$admin->phone}) can sign in with the phone code.");
+
+    return 0;
+})->purpose('Create an admin account that signs in by phone');
+
+// Server-side fallback; admins normally approve doctors in the app.
 Artisan::command('doctor:verify {doctor : User id or exact phone number}', function (string $doctor) {
     $user = User::role('doctor')
         ->with('doctorProfile')

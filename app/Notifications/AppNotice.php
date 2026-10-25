@@ -23,6 +23,9 @@ class AppNotice extends Notification
 
     public const VISIT_REMINDER = 'visit_reminder';
 
+    /** An admin approved or rejected a doctor's registration (audit L2). */
+    public const ACCOUNT_REVIEWED = 'account_reviewed';
+
     /**
      * @param  array<string, int|string|null>  $target  ids the app needs to open the screen
      * @param  string|null  $dedupe  while an unread notice with this key exists, no new one is added

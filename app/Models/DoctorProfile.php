@@ -28,10 +28,17 @@ class DoctorProfile extends Model
     protected $casts = [
         'is_online' => 'boolean',
         'last_seen_at' => 'datetime',
+        'reviewed_at' => 'datetime',
         'experience_years' => 'integer',
         'consultation_fee' => 'decimal:2',
         'rating' => 'decimal:2',
     ];
+    /** The admin who approved or rejected the registration (audit L2). */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_user_id');
+    }
+
     /** The app sends a presence heartbeat every 2 minutes while online; this allows for missed beats. */
     public const PRESENCE_TTL_MINUTES = 5;
 

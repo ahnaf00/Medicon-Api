@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ConsultationCallController;
 use App\Http\Controllers\Api\ConsultationChatController;
 use App\Http\Controllers\Api\ConsultationController;
 use App\Http\Controllers\Api\ConsultationTranscriptController;
+use App\Http\Controllers\Api\Admin\DoctorApprovalController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DirectChatController;
 use App\Http\Controllers\Api\NotificationController;
@@ -103,6 +104,15 @@ Route::prefix('v1')->group(function () {
         });
 
         // --- Doctor-Restricted Routes ---
+        // --- Admin (audit L2): doctor approvals; the later admin dashboard builds on this ---
+        Route::middleware('role:admin')->prefix('admin')->group(function () {
+            Route::get('/summary', [DoctorApprovalController::class, 'summary']);
+            Route::get('/doctors', [DoctorApprovalController::class, 'index']);
+            Route::get('/doctors/{id}', [DoctorApprovalController::class, 'show'])->whereNumber('id');
+            Route::post('/doctors/{id}/approve', [DoctorApprovalController::class, 'approve'])->whereNumber('id');
+            Route::post('/doctors/{id}/reject', [DoctorApprovalController::class, 'reject'])->whereNumber('id');
+        });
+
         Route::middleware(['role:doctor', 'doctor.verified'])->group(function () {
             Route::get('/doctor/dashboard', [DoctorDashboardController::class, 'index']);
             Route::get('/doctor/presence', [DoctorPresenceController::class, 'show']);

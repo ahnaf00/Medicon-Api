@@ -26,6 +26,11 @@ class DoctorProfileResource extends JsonResource
             'rating'                => (float) $this->rating,
             'bio'                   => $this->bio,
             'verificationStatus'    => $this->verification_status,
+            // Only the doctor themself sees why their registration was rejected (audit L2).
+            'rejectionReason'       => $this->when(
+                $request->user()?->id === (int) $this->user_id,
+                fn () => $this->rejection_reason,
+            ),
             'followUpFee'           => (float) $this->follow_up_fee,
             'isOnline'              => $this->resource->isOnlineNow(),
             // Only present when computed for ranking (symptom search), so other endpoints don't pay for them.
