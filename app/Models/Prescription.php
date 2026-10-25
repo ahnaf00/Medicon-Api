@@ -45,12 +45,12 @@ class Prescription extends Model
 
     public function patient():BelongsTo
     {
-        return $this->belongsTo(User::class,'patient_user_id');
+        return $this->belongsTo(User::class,'patient_user_id')->withTrashed();
     }
 
     public function doctor():BelongsTo
     {
-        return $this->belongsTo(User::class,'doctor_user_id');
+        return $this->belongsTo(User::class,'doctor_user_id')->withTrashed();
     }
 
     public function items():HasMany

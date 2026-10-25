@@ -36,7 +36,7 @@ class DoctorProfile extends Model
     /** The admin who approved or rejected the registration (audit L2). */
     public function reviewer(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'reviewed_by_user_id');
+        return $this->belongsTo(User::class, 'reviewed_by_user_id')->withTrashed();
     }
 
     /** The app sends a presence heartbeat every 2 minutes while online; this allows for missed beats. */

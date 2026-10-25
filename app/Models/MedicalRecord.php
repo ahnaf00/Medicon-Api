@@ -44,7 +44,7 @@ class MedicalRecord extends Model
     }
     public function recordedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'recorded_by_user_id');
+        return $this->belongsTo(User::class, 'recorded_by_user_id')->withTrashed();
     }
     public function pages(): HasMany
     {

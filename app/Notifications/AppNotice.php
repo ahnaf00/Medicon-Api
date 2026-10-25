@@ -26,6 +26,9 @@ class AppNotice extends Notification
     /** An admin approved or rejected a doctor's registration (audit L2). */
     public const ACCOUNT_REVIEWED = 'account_reviewed';
 
+    /** The other person closed their account, so an upcoming visit was cancelled (audit L3). */
+    public const VISIT_CANCELLED = 'visit_cancelled';
+
     /**
      * @param  array<string, int|string|null>  $target  ids the app needs to open the screen
      * @param  string|null  $dedupe  while an unread notice with this key exists, no new one is added

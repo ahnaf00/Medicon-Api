@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ConsultationCallController;
 use App\Http\Controllers\Api\ConsultationChatController;
 use App\Http\Controllers\Api\ConsultationController;
 use App\Http\Controllers\Api\ConsultationTranscriptController;
+use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\Admin\DoctorApprovalController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DirectChatController;
@@ -48,6 +49,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/restore-account', [AccountController::class, 'restore']);
     });
 
     // Publicly browse doctors and doctor details
@@ -79,6 +81,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/user/me/phone/send-otp', [PhoneChangeController::class, 'send'])->middleware('throttle:otp-send');
         Route::post('/user/me/phone/verify', [PhoneChangeController::class, 'verify'])->middleware('throttle:otp-verify');
         Route::post('/user/avatar', [AuthController::class, 'uploadAvatar']);
+        // Account deletion and data export (audit L3).
+        Route::post('/user/me/deletion-code', [AccountController::class, 'sendDeletionCode'])->middleware('throttle:3,10');
+        Route::delete('/user/me', [AccountController::class, 'destroy'])->middleware('throttle:10,10');
+        Route::get('/user/me/export', [AccountController::class, 'export'])->middleware('throttle:5,60');
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
         // --- Appointments Domain ---

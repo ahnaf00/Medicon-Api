@@ -95,7 +95,7 @@ it('consumes the proof, so it cannot be used twice', function () {
     $proof = verifyNewPhone('01700000003');
     $this->postJson('/api/v1/auth/register', patientPayload('01700000003', $proof))->assertCreated();
 
-    User::where('phone', '+8801700000003')->delete();
+    User::where('phone', '+8801700000003')->forceDelete();
 
     $this->postJson('/api/v1/auth/register', patientPayload('01700000003', $proof))
         ->assertStatus(422)

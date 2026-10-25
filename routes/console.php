@@ -4,6 +4,7 @@ use App\Models\Appointment;
 use App\Models\ConsultationTranscript;
 use App\Models\Prescription;
 use App\Models\User;
+use App\Services\AccountDeletionService;
 use App\Services\AppointmentLifecycle;
 use App\Services\ConsultationTranscriptPipeline;
 use App\Services\DoctorSlotService;
@@ -209,6 +210,23 @@ Artisan::command('appointments:remind', function (InAppNotifier $notifier) {
     return 0;
 })->purpose('Remind patient and doctor about visits starting within the hour');
 Schedule::command('appointments:remind')->everyFiveMinutes();
+
+// Accounts deleted more than the grace period ago lose their personal data (audit L3).
+Artisan::command('accounts:purge', function (AccountDeletionService $accounts) {
+    $due = User::onlyTrashed()
+        ->whereNull('purged_at')
+        ->where('deleted_at', '<=', now()->subDays(AccountDeletionService::GRACE_DAYS))
+        ->get();
+
+    foreach ($due as $user) {
+        $accounts->purge($user);
+    }
+
+    $this->info("Purged {$due->count()} account(s).");
+
+    return 0;
+})->purpose('Remove personal data of accounts deleted more than 30 days ago');
+Schedule::command('accounts:purge')->dailyAt('03:00');
 
 Schedule::command('transcripts:finalize-stale')->hourly();
 

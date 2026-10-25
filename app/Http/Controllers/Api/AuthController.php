@@ -12,6 +12,7 @@ use App\Http\Resources\UserResource;
 use App\Models\DoctorProfile;
 use App\Models\PatientProfile;
 use App\Models\User;
+use App\Services\AccountDeletionService;
 use App\Services\PhoneOtpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -137,7 +138,17 @@ class AuthController extends Controller
             return response()->json(['message' => $message], $status);
         }
 
-        $user = User::where('phone', $phone)->first();
+        $user = User::withTrashed()->where('phone', $phone)->first();
+
+        // A deleted account in its grace period may be restored, never silently re-registered (audit L3).
+        if ($user?->trashed()) {
+            return response()->json([
+                'isNewUser' => false,
+                'accountDeleted' => true,
+                'purgeAt' => app(AccountDeletionService::class)->purgeDate($user)?->toIso8601String(),
+                'restore_token' => AccountController::issueRestoreToken($user),
+            ], 200);
+        }
 
         if (!$user) {
             $proof = Str::random(64);
@@ -150,18 +161,22 @@ class AuthController extends Controller
             return response()->json(['message' => 'Account is suspended'], 403);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        return response()->json(self::signedInPayload($user), 200);
+    }
 
-        return response()->json([
+    /** What verify-otp (and an account restore) returns: a new token and who signed in. */
+    public static function signedInPayload(User $user): array
+    {
+        return [
             'isNewUser' => false,
-            'access_token' => $token,
+            'access_token' => $user->createToken('auth_token')->plainTextToken,
             'token_type' => 'Bearer',
             'user' => [
                 'id' => $user->id,
                 'role' => $user->getRoleNames()->first(),
                 'status' => $user->status,
-            ]
-        ], 200);
+            ],
+        ];
     }
 
     public function login(LoginRequest $request): JsonResponse
