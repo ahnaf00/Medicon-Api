@@ -8,6 +8,7 @@ use App\Http\Resources\ConsultationSummaryResource;
 use App\Models\AiChatSession;
 use App\Models\Appointment;
 use App\Models\ConsultationSummary;
+use App\Services\InAppNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -91,6 +92,10 @@ class ConsultationController extends Controller
         );
 
         $appointment->setRelation('consultationSummary', $summary);
+
+        if (! $existing?->published_at && $summary->published_at) {
+            app(InAppNotifier::class)->summaryShared($appointment);
+        }
 
         return response()->json($this->payload($appointment), $summary->wasRecentlyCreated ? 201 : 200);
     }

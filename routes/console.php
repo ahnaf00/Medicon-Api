@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\AppointmentLifecycle;
 use App\Services\ConsultationTranscriptPipeline;
 use App\Services\DoctorSlotService;
+use App\Services\InAppNotifier;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -157,6 +158,32 @@ Artisan::command('appointments:expire', function (AppointmentLifecycle $lifecycl
 })->purpose('Expire visits nobody started and close visits left in progress');
 
 Schedule::command('appointments:expire')->everyFiveMinutes();
+
+// In-app "visit starts soon" notice for both people, about an hour before (audit L5).
+Artisan::command('appointments:remind', function (InAppNotifier $notifier) {
+    $due = Appointment::where('status', 'scheduled')
+        ->whereNull('reminder_sent_at')
+        ->whereBetween('appointment_datetime', [now(), now()->addHour()])
+        ->get();
+
+    $sent = 0;
+    foreach ($due as $appointment) {
+        // Claim the row first, so two overlapping runs never remind twice.
+        $claimed = Appointment::whereKey($appointment->id)
+            ->whereNull('reminder_sent_at')
+            ->update(['reminder_sent_at' => now()]);
+
+        if ($claimed) {
+            $notifier->visitReminder($appointment);
+            $sent++;
+        }
+    }
+
+    $this->info("Sent reminders for {$sent} visit(s).");
+
+    return 0;
+})->purpose('Remind patient and doctor about visits starting within the hour');
+Schedule::command('appointments:remind')->everyFiveMinutes();
 
 Schedule::command('transcripts:finalize-stale')->hourly();
 

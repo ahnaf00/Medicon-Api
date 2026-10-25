@@ -10,6 +10,7 @@ use App\Http\Resources\ConversationResource;
 use App\Http\Resources\MessageResource;
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Services\InAppNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -174,6 +175,8 @@ class ConversationController extends Controller
             'body'           => $request->validated('body'),
         ]);
         $message->setRelation('conversation', $conversation);
+
+        app(InAppNotifier::class)->messageSent($conversation, $message);
 
         return response()->json([
             'message' => 'Message sent.',

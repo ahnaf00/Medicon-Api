@@ -18,6 +18,7 @@ class Appointment extends Model
         'duration_minutes',
         'started_at',
         'ended_at',
+        'reminder_sent_at',
         'format',
         'status',
         'notes',
@@ -27,6 +28,7 @@ class Appointment extends Model
         'appointment_datetime' => 'datetime',
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
+        'reminder_sent_at' => 'datetime',
     ];
 
     public function patient():BelongsTo

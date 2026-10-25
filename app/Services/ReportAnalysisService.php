@@ -68,6 +68,8 @@ PROMPT;
             'analysis_status' => 'failed',
             'analysis_error' => $reason,
         ])->save();
+
+        app(InAppNotifier::class)->reportAnalysed($record);
     }
 
     private function run(MedicalRecord $record): void
@@ -124,6 +126,8 @@ PROMPT;
                 'analyzed_at' => now(),
             ])->save();
         });
+
+        app(InAppNotifier::class)->reportAnalysed($record);
     }
 
     /**
