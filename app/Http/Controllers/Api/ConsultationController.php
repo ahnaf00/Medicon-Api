@@ -27,6 +27,12 @@ class ConsultationController extends Controller
 
         Gate::authorize('viewSummary', $appointment);
 
+        // The patient sees the summary only once the doctor has shared it (audit G7).
+        if ($request->user()->id !== (int) $appointment->doctor_user_id
+            && ! $appointment->consultationSummary?->published_at) {
+            $appointment->setRelation('consultationSummary', null);
+        }
+
         return response()->json($this->payload($appointment) + [
             // The patient's existing consultation chat, so the app can load its history.
             'chatSessionId' => AiChatSession::where('user_id', $request->user()->id)
@@ -56,11 +62,18 @@ class ConsultationController extends Controller
             ], 422);
         }
 
+        $publish = (bool) ($validated['publish'] ?? false);
+        if ($publish && $appointment->status !== 'completed') {
+            return response()->json([
+                'message' => 'Complete the consultation before sharing the summary with the patient.',
+            ], 409);
+        }
+
+        $existing = ConsultationSummary::where('appointment_id', $appointment->id)->first();
+
         // An edit that does not say otherwise keeps where the summary came from,
         // so the patient keeps access to the transcript it was based on.
-        $source = $validated['source']
-            ?? ConsultationSummary::where('appointment_id', $appointment->id)->value('source')
-            ?? 'doctor_note';
+        $source = $validated['source'] ?? $existing?->source ?? 'doctor_note';
 
         $summary = ConsultationSummary::updateOrCreate(
             ['appointment_id' => $appointment->id],
@@ -72,6 +85,8 @@ class ConsultationController extends Controller
                 'advice'          => $validated['advice'] ?? null,
                 'red_flags'       => array_values($validated['red_flags'] ?? []),
                 'source'          => $source,
+                // A draft until shared; once shared, edits stay shared.
+                'published_at'    => $existing?->published_at ?? ($publish ? now() : null),
             ],
         );
 

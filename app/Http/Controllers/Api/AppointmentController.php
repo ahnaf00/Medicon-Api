@@ -24,16 +24,17 @@ class AppointmentController extends Controller
         $user = $request->user();
 
         $appointments = Appointment::with(['doctor.doctorProfile', 'patient.patientProfile'])
-            ->withExists('consultationSummary')
             ->orderBy('appointment_datetime','asc');
 
         if($user->hasRole('doctor'))
         {
-            $appointments->where('doctor_user_id',$user->id);
+            $appointments->where('doctor_user_id',$user->id)->withExists('consultationSummary');
         }
         else
         {
-            $appointments->where('patient_user_id',$user->id);
+            // A draft summary does not exist for the patient yet (audit G7).
+            $appointments->where('patient_user_id',$user->id)
+                ->withExists(['consultationSummary' => fn ($q) => $q->whereNotNull('published_at')]);
         }
 
         return AppointmentResource::collection($appointments->get());

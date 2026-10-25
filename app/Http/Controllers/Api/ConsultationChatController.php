@@ -41,7 +41,7 @@ class ConsultationChatController extends Controller
         Gate::authorize('consultationChat', $appointment);
 
         // Without the doctor's summary there is nothing to ground an answer in.
-        if ($appointment->status !== 'completed' || ! $appointment->consultationSummary) {
+        if ($appointment->status !== 'completed' || ! $appointment->consultationSummary?->published_at) {
             return response()->json([
                 'message' => 'This consultation has no summary from your doctor yet, so the AI cannot answer questions about it.',
             ], 409);

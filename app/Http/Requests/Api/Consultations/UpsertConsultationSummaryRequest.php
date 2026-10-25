@@ -23,6 +23,8 @@ class UpsertConsultationSummaryRequest extends FormRequest
             // `transcript` = the doctor started from the call transcript's AI
             // draft; allowed only once that transcript is ready (controller).
             'source'          => ['sometimes', 'string', 'in:doctor_note,transcript'],
+            // Share with the patient now (audit G7); only once the visit is completed.
+            'publish'         => ['sometimes', 'boolean'],
         ];
     }
 }

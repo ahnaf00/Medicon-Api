@@ -276,7 +276,7 @@ it('validates the consent flag', function () {
 
 // --- transcript policy ------------------------------------------------------
 
-it('shows the transcript to the patient only after a transcript summary is saved', function () {
+it('shows the transcript to the patient only after a transcript summary is shared', function () {
     $stranger = makePatient();
 
     expect($this->doctor->can('viewTranscript', $this->appointment))->toBeTrue()
@@ -292,6 +292,10 @@ it('shows the transcript to the patient only after a transcript summary is saved
     expect($this->patient->can('viewTranscript', $this->appointment))->toBeFalse();
 
     $summary->update(['source' => 'transcript']);
+    // Still a draft (audit G7).
+    expect($this->patient->can('viewTranscript', $this->appointment))->toBeFalse();
+
+    $summary->update(['published_at' => now()]);
     expect($this->patient->can('viewTranscript', $this->appointment))->toBeTrue()
         ->and($stranger->can('viewTranscript', $this->appointment))->toBeFalse();
 });

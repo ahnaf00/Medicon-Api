@@ -70,7 +70,8 @@ class AppointmentPolicy
         }
 
         return $user->id === (int) $appointment->patient_user_id
-            && $appointment->consultationSummary()->where('source', 'transcript')->exists();
+            && $appointment->consultationSummary()->where('source', 'transcript')
+                ->whereNotNull('published_at')->exists();
     }
 
     private function isParticipant(User $user, Appointment $appointment): bool

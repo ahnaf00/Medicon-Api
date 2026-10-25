@@ -21,10 +21,12 @@ class ConsultationSummary extends Model
         'advice',
         'red_flags',
         'source',
+        'published_at',
     ];
 
     protected $casts = [
         'red_flags' => 'array',
+        'published_at' => 'datetime',
     ];
 
     public function appointment(): BelongsTo

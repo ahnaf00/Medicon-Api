@@ -20,6 +20,7 @@ class ConsultationSummaryResource extends JsonResource
             'advice'         => $this->advice,
             'redFlags'       => $this->red_flags ?? [],
             'source'         => $this->source,
+            'publishedAt'    => $this->published_at?->toIso8601String(),
             'createdAt'      => $this->created_at?->toIso8601String(),
             'updatedAt'      => $this->updated_at?->toIso8601String(),
         ];

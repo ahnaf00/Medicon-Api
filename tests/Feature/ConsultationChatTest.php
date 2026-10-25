@@ -56,6 +56,7 @@ beforeEach(function () {
         'findings' => 'ECG reviewed, normal sinus rhythm',
         'advice' => 'Aspirin 75 mg daily',
         'red_flags' => ['Chest pain at rest'],
+        'published_at' => now(),
     ]);
 });
 

@@ -143,12 +143,16 @@ it('shows the doctor the transcript with the AI draft', function () {
         ->assertJsonPath('data.segments.1', ['speakerRole' => 'patient', 'startMs' => 3500, 'text' => 'আমার তিন দিন ধরে কাশি।']);
 });
 
-it('hides the transcript from the patient until the doctor saves a transcript-based summary', function () {
+it('hides the transcript from the patient until the doctor shares a transcript-based summary', function () {
     $this->transcript->update(['status' => 'ready', 'draft_summary' => ['chief_complaint' => 'Cough.']]);
 
     $this->actingAs($this->patient, 'sanctum')->getJson(transcriptUrl($this->appointment))->assertForbidden();
 
+    // A draft is not shared yet (audit G7).
     saveSummary($this->doctor, $this->appointment, ['source' => 'transcript'])->assertCreated();
+    $this->actingAs($this->patient, 'sanctum')->getJson(transcriptUrl($this->appointment))->assertForbidden();
+
+    saveSummary($this->doctor, $this->appointment, ['publish' => true])->assertOk();
 
     $this->actingAs($this->patient, 'sanctum')->getJson(transcriptUrl($this->appointment))
         ->assertOk()
