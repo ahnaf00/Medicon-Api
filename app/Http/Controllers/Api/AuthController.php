@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -179,19 +180,49 @@ class AuthController extends Controller
         ];
     }
 
+    /** Wrong passwords allowed per account before password sign-in locks (audit F11). */
+    public const PASSWORD_MAX_ATTEMPTS = 5;
+
+    public const PASSWORD_LOCK_SECONDS = 15 * 60;
+
+    /**
+     * Email/phone + password sign-in. The app uses the phone code instead; this
+     * stays for a later email login (owner decision 2026-10-24) and is hardened:
+     * a per-account lockout, and no password-only sign-in for doctors or admins.
+     */
     public function login(LoginRequest $request): JsonResponse
     {
         $validated = $request->validated();
+
+        // Keyed by what was typed, so an unknown account locks the same way as a real one.
+        $lockKey = 'password-login:'.hash('sha256', mb_strtolower(trim($validated['login'])));
+        if (RateLimiter::tooManyAttempts($lockKey, self::PASSWORD_MAX_ATTEMPTS)) {
+            $minutes = (int) ceil(RateLimiter::availableIn($lockKey) / 60);
+
+            return response()->json([
+                'message' => "Too many wrong passwords. Try again in {$minutes} minute(s), or sign in with the phone code.",
+            ], 429);
+        }
 
         $user = User::where('email', $validated['login'])
             ->orWhere('phone', $validated['login'])
             ->first();
 
+        if (!$user || !$user->password || !Hash::check($validated['password'], $user->password)) {
+            RateLimiter::hit($lockKey, self::PASSWORD_LOCK_SECONDS);
 
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'login' => ['The provided credentials are incorrect.'],
             ]);
+        }
+
+        RateLimiter::clear($lockKey);
+
+        // Clinicians and admins need a second step; until that exists they use the phone code.
+        if ($user->hasAnyRole(['doctor', 'admin'])) {
+            return response()->json([
+                'message' => 'Doctors and admins sign in with the phone code.',
+            ], 403);
         }
 
         if ($user->status === 'suspended') {
