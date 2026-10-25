@@ -39,6 +39,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'purged_at' => 'datetime',
+            'suspended_at' => 'datetime',
         ];
     }
 

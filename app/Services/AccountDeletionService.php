@@ -119,6 +119,7 @@ class AccountDeletionService
                 'password' => null,
                 'avatar_url' => null,
                 'remember_token' => null,
+                'suspension_reason' => null,
                 'purged_at' => now(),
             ])->saveQuietly();
         });

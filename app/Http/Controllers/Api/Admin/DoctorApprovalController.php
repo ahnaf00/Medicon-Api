@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminAuditLog;
 use App\Models\DoctorProfile;
 use App\Models\User;
 use App\Notifications\AppNotice;
@@ -82,6 +83,8 @@ class DoctorApprovalController extends Controller
             if ($doctor->status === 'pending') {
                 $doctor->forceFill(['status' => 'active'])->save();
             }
+
+            AdminAuditLog::record($request->user(), AdminAuditLog::DOCTOR_APPROVED, $doctor);
         });
 
         $notifier->send($doctor, new AppNotice(
@@ -107,12 +110,16 @@ class DoctorApprovalController extends Controller
             return response()->json(['message' => 'Only a pending registration can be rejected.'], 409);
         }
 
-        $profile->forceFill([
-            'verification_status' => 'rejected',
-            'rejection_reason' => trim($validated['reason']),
-            'reviewed_by_user_id' => $request->user()->id,
-            'reviewed_at' => now(),
-        ])->save();
+        DB::transaction(function () use ($request, $doctor, $profile, $validated) {
+            $profile->forceFill([
+                'verification_status' => 'rejected',
+                'rejection_reason' => trim($validated['reason']),
+                'reviewed_by_user_id' => $request->user()->id,
+                'reviewed_at' => now(),
+            ])->save();
+
+            AdminAuditLog::record($request->user(), AdminAuditLog::DOCTOR_REJECTED, $doctor, trim($validated['reason']));
+        });
 
         $notifier->send($doctor, new AppNotice(
             AppNotice::ACCOUNT_REVIEWED,
