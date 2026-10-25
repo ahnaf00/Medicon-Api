@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Admin\AuditLogController;
 use App\Http\Controllers\Api\Admin\DoctorApprovalController;
 use App\Http\Controllers\Api\Admin\OverviewController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Api\Admin\VisitController as AdminVisitController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DirectChatController;
 use App\Http\Controllers\Api\NotificationController;
@@ -121,6 +122,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/users/{id}/suspend', [AdminUserController::class, 'suspend'])->whereNumber('id');
             Route::post('/users/{id}/reactivate', [AdminUserController::class, 'reactivate'])->whereNumber('id');
             Route::get('/audit-log', [AuditLogController::class, 'index']);
+            Route::get('/visits', [AdminVisitController::class, 'index']);
+            Route::get('/visits/{id}', [AdminVisitController::class, 'show'])->whereNumber('id');
             Route::get('/summary', [DoctorApprovalController::class, 'summary']);
             Route::get('/doctors', [DoctorApprovalController::class, 'index']);
             Route::get('/doctors/{id}', [DoctorApprovalController::class, 'show'])->whereNumber('id');

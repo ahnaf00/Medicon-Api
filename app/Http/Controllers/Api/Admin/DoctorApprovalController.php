@@ -40,15 +40,31 @@ class DoctorApprovalController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'status' => ['nullable', 'in:'.implode(',', self::STATUSES)],
+            // `all` is the admin directory (audit L2b step 2); the others are the review queues.
+            'status' => ['nullable', 'in:all,'.implode(',', self::STATUSES)],
+            'q' => ['nullable', 'string', 'max:100'],
+            'online' => ['nullable', 'boolean'],
         ]);
         $status = $validated['status'] ?? 'pending';
+        $term = trim($validated['q'] ?? '');
 
         $page = User::role('doctor')
-            ->whereHas('doctorProfile', fn ($q) => $q->where('verification_status', $status))
+            ->whereHas('doctorProfile', fn ($q) => $q
+                ->when($status !== 'all', fn ($q) => $q->where('verification_status', $status))
+                ->when($request->boolean('online'), fn ($q) => $q->where('is_online', true)))
+            ->when($term !== '', fn ($q) => $q->where(fn ($q) => $q
+                ->where('name', 'like', "%{$term}%")
+                ->orWhereHas('doctorProfile', fn ($p) => $p
+                    ->where('specialty', 'like', "%{$term}%")
+                    ->orWhere('bmdc_registration_no', 'like', "%{$term}%"))))
             ->with('doctorProfile.reviewer')
-            // Oldest waiting first for the queue; most recently reviewed first otherwise.
-            ->when($status === 'pending', fn ($q) => $q->oldest(), fn ($q) => $q->latest('updated_at'))
+            ->withCount([
+                'appointmentsAsDoctor as visits_completed' => fn ($q) => $q->where('status', 'completed'),
+                'appointmentsAsDoctor as visits_upcoming' => fn ($q) => $q->where('status', 'scheduled'),
+            ])
+            // Directory A-Z; oldest waiting first for the queue; most recently reviewed first otherwise.
+            ->when($status === 'all', fn ($q) => $q->orderBy('name'),
+                fn ($q) => $status === 'pending' ? $q->oldest() : $q->latest('updated_at'))
             ->paginate(20);
 
         return response()->json([
@@ -133,7 +149,12 @@ class DoctorApprovalController extends Controller
 
     private function findDoctor(int $id): User
     {
-        return User::role('doctor')->whereHas('doctorProfile')->with('doctorProfile.reviewer')->findOrFail($id);
+        return User::role('doctor')->whereHas('doctorProfile')->with('doctorProfile.reviewer')
+            ->withCount([
+                'appointmentsAsDoctor as visits_completed' => fn ($q) => $q->where('status', 'completed'),
+                'appointmentsAsDoctor as visits_upcoming' => fn ($q) => $q->where('status', 'scheduled'),
+            ])
+            ->findOrFail($id);
     }
 
     /** @return array<string, mixed> */
@@ -156,6 +177,12 @@ class DoctorApprovalController extends Controller
             'rejectionReason' => $p->rejection_reason,
             'reviewedAt' => $p->reviewed_at?->toIso8601String(),
             'reviewedBy' => $p->reviewer?->name,
+            'isOnline' => (bool) $p->is_online,
+            'accountStatus' => $u->status,
+            'visits' => [
+                'completed' => (int) ($u->visits_completed ?? 0),
+                'upcoming' => (int) ($u->visits_upcoming ?? 0),
+            ],
         ];
     }
 }
