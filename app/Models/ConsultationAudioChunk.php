@@ -21,12 +21,16 @@ class ConsultationAudioChunk extends Model
         'file_path',
         'started_at_ms',
         'duration_ms',
+        'result',
+        'transcribed_at',
     ];
 
     protected $casts = [
         'session_started_at_ms' => 'integer',
         'started_at_ms' => 'integer',
         'duration_ms' => 'integer',
+        'result' => 'array',
+        'transcribed_at' => 'datetime',
     ];
 
     public function transcript(): BelongsTo

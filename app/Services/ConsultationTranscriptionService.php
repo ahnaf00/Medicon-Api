@@ -54,18 +54,6 @@ Rules:
 - language: bn if the speech is Bangla, en if English, mixed if both are used substantially.
 PROMPT;
 
-    public function transcribe(ConsultationTranscript $transcript): void
-    {
-        try {
-            $this->run($transcript);
-        } catch (TranscriptionException $e) {
-            $this->markFailed($transcript, $e->getMessage());
-        } catch (Throwable $e) {
-            Log::warning("Transcription failed for consultation transcript {$transcript->id}: ".$e->getMessage());
-            $this->markFailed($transcript, self::GENERIC_ERROR);
-        }
-    }
-
     public function markFailed(ConsultationTranscript $transcript, string $reason): void
     {
         $transcript->forceFill([
@@ -74,53 +62,109 @@ PROMPT;
         ])->save();
     }
 
-    private function run(ConsultationTranscript $transcript): void
+    /**
+     * False (and the transcript marked failed) when transcription cannot run at all.
+     */
+    public function canStart(ConsultationTranscript $transcript): bool
     {
-        $apiKey = config('services.gemini.api_key');
-        if (empty($apiKey)) {
-            throw new TranscriptionException('Automatic transcription is not available right now. The recording is kept.');
+        if (empty(config('services.gemini.api_key'))) {
+            $this->markFailed($transcript, 'Automatic transcription is not available right now. The recording is kept.');
+
+            return false;
         }
 
-        /** @var Collection<int, ConsultationAudioChunk> $chunks */
-        $chunks = $transcript->audioChunks()->get()
-            ->sortBy([fn ($a, $b) => $a->absoluteStartMs() <=> $b->absoluteStartMs(), ['id', 'asc']])
-            ->values();
+        if (! $transcript->audioChunks()->exists()) {
+            $this->markFailed($transcript, 'There is no recording to transcribe.');
 
-        if ($chunks->isEmpty()) {
-            throw new TranscriptionException('There is no recording to transcribe.');
+            return false;
         }
 
-        $zeroMs = $chunks->first()->absoluteStartMs();
-        $segments = [];
-        $languages = [];
+        return true;
+    }
 
-        foreach ($chunks as $chunkIndex => $chunk) {
-            $result = $this->transcribeChunk($chunk, $apiKey);
-
-            if ($result['segments'] !== []) {
-                $languages[] = $result['language'];
+    /**
+     * Transcribes one chunk and stores the result on it (audit G8). On failure the
+     * transcript is marked failed with a short reason, the audio and every stored
+     * result are kept, and false is returned.
+     */
+    public function transcribeChunk(ConsultationAudioChunk $chunk): bool
+    {
+        try {
+            $apiKey = config('services.gemini.api_key');
+            if (empty($apiKey)) {
+                throw new TranscriptionException('Automatic transcription is not available right now. The recording is kept.');
             }
 
-            $offsetMs = $chunk->absoluteStartMs() - $zeroMs;
-            foreach ($result['segments'] as $i => $segment) {
-                $segments[] = [
-                    'speaker_role' => $chunk->speaker_role,
-                    'start_ms' => $offsetMs + $segment['start_ms'],
-                    'text' => $segment['text'],
-                    // Tie-breakers: earlier chunk, then the model's order.
-                    'chunk' => $chunkIndex,
-                    'index' => $i,
-                ];
-            }
+            $chunk->forceFill([
+                'result' => $this->requestChunk($chunk, $apiKey),
+                'transcribed_at' => now(),
+            ])->save();
+
+            return true;
+        } catch (TranscriptionException $e) {
+            $this->markFailed($chunk->transcript, $e->getMessage());
+        } catch (Throwable $e) {
+            Log::warning("Transcription failed for audio chunk {$chunk->id}: ".$e->getMessage());
+            $this->markFailed($chunk->transcript, self::GENERIC_ERROR);
         }
 
-        usort($segments, fn ($a, $b) => [$a['start_ms'], $a['chunk'], $a['index']] <=> [$b['start_ms'], $b['chunk'], $b['index']]);
+        return false;
+    }
 
-        DB::transaction(function () use ($transcript, $segments, $languages) {
-            $transcript->segments()->delete();
+    /**
+     * Once every chunk has a result, builds the speaker-labelled, time-ordered
+     * transcript from them. Runs under a lock, so of several chunk jobs finishing
+     * together exactly one assembles. Returns the new status, or null when it is
+     * not time yet (or another job already did it).
+     */
+    public function assembleIfComplete(ConsultationTranscript $transcript): ?string
+    {
+        return DB::transaction(function () use ($transcript) {
+            $locked = ConsultationTranscript::lockForUpdate()->find($transcript->getKey());
+
+            if ($locked?->status !== 'transcribing') {
+                return null;
+            }
+
+            /** @var Collection<int, ConsultationAudioChunk> $chunks */
+            $chunks = $locked->audioChunks()->get()
+                ->sortBy([fn ($a, $b) => $a->absoluteStartMs() <=> $b->absoluteStartMs(), ['id', 'asc']])
+                ->values();
+
+            if ($chunks->isEmpty() || $chunks->contains(fn ($chunk) => $chunk->transcribed_at === null)) {
+                return null;
+            }
+
+            $zeroMs = $chunks->first()->absoluteStartMs();
+            $segments = [];
+            $languages = [];
+
+            foreach ($chunks as $chunkIndex => $chunk) {
+                $result = $chunk->result ?? ['language' => null, 'segments' => []];
+
+                if ($result['segments'] !== []) {
+                    $languages[] = $result['language'];
+                }
+
+                $offsetMs = $chunk->absoluteStartMs() - $zeroMs;
+                foreach ($result['segments'] as $i => $segment) {
+                    $segments[] = [
+                        'speaker_role' => $chunk->speaker_role,
+                        'start_ms' => $offsetMs + $segment['start_ms'],
+                        'text' => $segment['text'],
+                        // Tie-breakers: earlier chunk, then the model's order.
+                        'chunk' => $chunkIndex,
+                        'index' => $i,
+                    ];
+                }
+            }
+
+            usort($segments, fn ($a, $b) => [$a['start_ms'], $a['chunk'], $a['index']] <=> [$b['start_ms'], $b['chunk'], $b['index']]);
+
+            $locked->segments()->delete();
 
             foreach ($segments as $order => $segment) {
-                $transcript->segments()->create([
+                $locked->segments()->create([
                     'speaker_role' => $segment['speaker_role'],
                     'start_ms' => $segment['start_ms'],
                     'text' => $segment['text'],
@@ -129,20 +173,24 @@ PROMPT;
             }
 
             // Nothing intelligible was said: there is nothing to summarise.
-            $transcript->forceFill([
-                'status' => $segments === [] ? 'ready' : 'summarizing',
+            $status = $segments === [] ? 'ready' : 'summarizing';
+
+            $locked->forceFill([
+                'status' => $status,
                 'error' => null,
                 'draft_summary' => null,
                 'language' => $this->overallLanguage($languages),
                 'transcribed_at' => now(),
             ])->save();
+
+            return $status;
         });
     }
 
     /**
      * @return array{language: ?string, segments: array<int, array{start_ms: int, text: string}>}
      */
-    private function transcribeChunk(ConsultationAudioChunk $chunk, string $apiKey): array
+    private function requestChunk(ConsultationAudioChunk $chunk, string $apiKey): array
     {
         $audio = Storage::disk('private')->get($chunk->file_path);
         if ($audio === null) {

@@ -2,6 +2,7 @@
 
 use App\Jobs\FinalizeConsultationTranscriptJob;
 use App\Jobs\SummarizeTranscriptJob;
+use App\Jobs\TranscribeAudioChunkJob;
 use App\Jobs\TranscribeConsultationJob;
 use App\Models\Appointment;
 use App\Models\ConsultationAudioChunk;
@@ -441,4 +442,68 @@ it('logs every consent change', function () {
             ['patient', false, Carbon::parse(CALL_START)->addSecond()->getTimestampMs()],
             ['patient', true, Carbon::parse(CALL_START)->addSeconds(2)->getTimestampMs()],
         ]);
+});
+
+// --- one job per chunk (audit G8 / REC-003) ---------------------------------
+
+it('queues one transcription job per chunk', function () {
+    Queue::fake([TranscribeAudioChunkJob::class]);
+    bothConsent($this->transcript);
+    uploadChunk($this->room)->assertCreated();
+    uploadChunk($this->room, ['identity' => "user-{$this->patient->id}", 'started_at_ms' => 500])->assertCreated();
+    finishVisit($this->appointment);
+
+    completeRoom($this->room)->assertOk();
+
+    Queue::assertPushed(TranscribeAudioChunkJob::class, 2);
+    expect($this->transcript->fresh()->status)->toBe('transcribing');
+});
+
+it('keeps finished chunks when one fails, and a retry redoes only that one', function () {
+    bothConsent($this->transcript);
+    uploadChunk($this->room)->assertCreated();
+    uploadChunk($this->room, ['identity' => "user-{$this->patient->id}", 'started_at_ms' => 500])->assertCreated();
+    finishVisit($this->appointment);
+
+    Http::fakeSequence('generativelanguage.googleapis.com/*')
+        ->push(geminiTranscript([['start_seconds' => 1.0, 'text' => 'Doctor speaking.']]))
+        ->push(['error' => 'boom'], 500)
+        ->push(['error' => 'boom'], 500)
+        // The retry: only the failed chunk, then the summary.
+        ->push(geminiTranscript([['start_seconds' => 2.0, 'text' => 'Patient answering.']]))
+        ->push(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+            'chief_complaint' => 'Not discussed', 'findings' => 'Not discussed',
+            'advice' => 'Not discussed', 'red_flags' => [],
+        ])]]]]]]);
+    completeRoom($this->room)->assertOk();
+
+    $chunks = ConsultationAudioChunk::orderBy('id')->get();
+    expect($this->transcript->fresh()->status)->toBe('failed')
+        ->and($chunks[0]->transcribed_at)->not->toBeNull()
+        ->and($chunks[1]->transcribed_at)->toBeNull();
+
+    expect(app(ConsultationTranscriptPipeline::class)->retry($this->transcript->fresh()))->toBeTrue();
+
+    $transcript = $this->transcript->fresh();
+    expect($transcript->status)->toBe('ready')
+        ->and($transcript->segments->pluck('text')->all())->toBe(['Doctor speaking.', 'Patient answering.']);
+    Http::assertSentCount(5);
+});
+
+it('does nothing when a chunk job runs again after the transcript is assembled', function () {
+    Queue::fake([SummarizeTranscriptJob::class]);
+    bothConsent($this->transcript);
+    uploadChunk($this->room)->assertCreated();
+    finishVisit($this->appointment);
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response(geminiTranscript([
+        ['start_seconds' => 1.0, 'text' => 'Hello.'],
+    ]))]);
+    completeRoom($this->room)->assertOk();
+    expect($this->transcript->fresh()->status)->toBe('summarizing');
+
+    (new TranscribeAudioChunkJob(ConsultationAudioChunk::sole()))->handle(app(ConsultationTranscriptionService::class));
+
+    Http::assertSentCount(1);
+    Queue::assertPushed(SummarizeTranscriptJob::class, 1);
+    expect($this->transcript->fresh()->segments)->toHaveCount(1);
 });

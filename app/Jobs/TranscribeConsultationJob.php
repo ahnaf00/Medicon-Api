@@ -8,6 +8,11 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
 
+/**
+ * Starts (or resumes) a transcript's transcription: one job per chunk that has
+ * no result yet, so a long call never has to fit in one job and a retry does
+ * not redo finished chunks (audit G8 / REC-003).
+ */
 class TranscribeConsultationJob implements ShouldQueue
 {
     use Queueable;
@@ -15,11 +20,8 @@ class TranscribeConsultationJob implements ShouldQueue
     /** One attempt: the doctor retries explicitly, which re-queues the job. */
     public int $tries = 1;
 
-    /**
-     * Every chunk is a separate Gemini call (up to 120 s each). Run the worker
-     * with `--timeout=600` and keep DB_QUEUE_RETRY_AFTER above this value.
-     */
-    public int $timeout = 600;
+    /** Only reads the database and queues jobs. */
+    public int $timeout = 60;
 
     public function __construct(public ConsultationTranscript $transcript)
     {
@@ -27,16 +29,31 @@ class TranscribeConsultationJob implements ShouldQueue
 
     public function handle(ConsultationTranscriptionService $service): void
     {
+        $transcript = $this->transcript->fresh();
+
         // A stale or duplicate job must not redo a finished transcript.
-        if ($this->transcript->fresh()?->status !== 'transcribing') {
+        if ($transcript?->status !== 'transcribing') {
             return;
         }
 
-        $service->transcribe($this->transcript);
-
-        if ($this->transcript->fresh()?->status === 'summarizing') {
-            SummarizeTranscriptJob::dispatch($this->transcript);
+        if (! $service->canStart($transcript)) {
+            return;
         }
+
+        $pending = $transcript->audioChunks()->whereNull('transcribed_at')->orderBy('id')->get();
+
+        if ($pending->isEmpty()) {
+            // Every chunk was done before (e.g. a retry after the last one failed late).
+            if ($service->assembleIfComplete($transcript) === 'summarizing') {
+                SummarizeTranscriptJob::dispatch($transcript->fresh());
+            }
+
+            return;
+        }
+
+        // In time order, so a synchronous queue (tests) processes them as a call would.
+        $pending->sortBy(fn ($chunk) => [$chunk->absoluteStartMs(), $chunk->id])
+            ->each(fn ($chunk) => TranscribeAudioChunkJob::dispatch($chunk));
     }
 
     /**
