@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ConsultationChatController;
 use App\Http\Controllers\Api\ConsultationController;
 use App\Http\Controllers\Api\ConsultationTranscriptController;
 use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\DirectChatController;
 use App\Http\Controllers\Api\DoctorAvailabilityController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\HospitalController;
@@ -144,6 +145,10 @@ Route::prefix('v1')->group(function () {
             ->middleware('throttle:ai');
 
         // --- Conversations / Q&A Domain ---
+        // --- Direct doctor-patient chat (audit M1) ---
+        Route::get('/chats', [DirectChatController::class, 'index']);
+        Route::post('/chats', [DirectChatController::class, 'open'])->middleware('throttle:30,1');
+
         Route::get('/conversations', [ConversationController::class, 'index']);
         Route::post('/conversations', [ConversationController::class, 'store']);
         Route::patch('/conversations/{id}', [ConversationController::class, 'update']);

@@ -22,7 +22,9 @@ class ConversationController extends Controller
     {
         $user = $request->user();
         
-        $query = Conversation::with(['patient', 'doctor', 'latestMessage', 'firstMessage'])
+        // Q&A questions only; direct chats are listed by DirectChatController (audit M1).
+        $query = Conversation::where('type', Conversation::TYPE_QUESTION)
+            ->with(['patient', 'doctor', 'latestMessage', 'firstMessage'])
             ->withCount(['messages as reply_count' => fn ($q) => $q->whereColumn('messages.sender_user_id', '!=', 'conversations.patient_user_id')]);
         
         if ($user->hasRole('doctor')) {

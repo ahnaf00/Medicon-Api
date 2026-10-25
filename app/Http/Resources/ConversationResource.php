@@ -25,6 +25,7 @@ class ConversationResource extends JsonResource
 
         return [
                 'id'            => $this->id,
+                'type'          => $this->type ?? 'question',
                 'subject'       => $this->subject,
                 'status'        => $this->status,
                 'department'    => $this->department,
@@ -33,6 +34,11 @@ class ConversationResource extends JsonResource
                 'replyCount'    => $this->when(
                     array_key_exists('reply_count', $this->resource->getAttributes()),
                     fn () => (int) $this->reply_count,
+                ),
+                // Messages from the other person not read yet; only on the chat list (audit M1).
+                'unreadCount'   => $this->when(
+                    array_key_exists('unread_count', $this->resource->getAttributes()),
+                    fn () => (int) $this->unread_count,
                 ),
                 'patient'       => $hidePatient ? null : new UserResource($this->whenLoaded('patient')),
                 'doctor'        => new UserResource($this->whenLoaded('doctor')),

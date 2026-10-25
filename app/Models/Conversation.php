@@ -9,7 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Conversation extends Model
 {
-    protected $fillable = ['patient_user_id', 'doctor_user_id', 'subject', 'status', 'department', 'is_anonymous'];
+    /** A Q&A question, or a direct doctor-patient chat (audit M1). */
+    public const TYPE_QUESTION = 'question';
+
+    public const TYPE_DIRECT = 'direct';
+
+    protected $attributes = ['type' => self::TYPE_QUESTION];
+
+    protected $fillable = ['type', 'direct_pair', 'patient_user_id', 'doctor_user_id', 'subject', 'status', 'department', 'is_anonymous'];
     protected $casts = ['is_anonymous' => 'boolean'];
 
     /** True when the patient asked anonymously and the viewer is not that patient. */

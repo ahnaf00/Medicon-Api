@@ -26,7 +26,9 @@ class ConversationPolicy
      */
     public function update(User $user, Conversation $conversation): bool
     {
-        return $user->id === (int) $conversation->patient_user_id && ! $conversation->hasReply();
+        return $conversation->type === Conversation::TYPE_QUESTION
+            && $user->id === (int) $conversation->patient_user_id
+            && ! $conversation->hasReply();
     }
 
     /** Same rule as editing: an answered question is part of the doctor's record too. */
@@ -54,7 +56,8 @@ class ConversationPolicy
      */
     private function canClaim(User $user, Conversation $conversation): bool
     {
-        return $conversation->doctor_user_id === null
+        return $conversation->type === Conversation::TYPE_QUESTION
+            && $conversation->doctor_user_id === null
             && $user->isVerifiedDoctor()
             && $conversation->department === $user->doctorProfile->specialty;
     }
