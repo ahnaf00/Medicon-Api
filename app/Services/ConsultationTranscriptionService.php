@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AiUsageEvent;
 use App\Models\ConsultationAudioChunk;
 use App\Models\ConsultationTranscript;
 use Illuminate\Http\Client\ConnectionException;
@@ -202,6 +203,7 @@ PROMPT;
 
         $response = Http::timeout(120)
             ->withHeaders(['x-goog-api-key' => $apiKey])
+            ->withAttributes([AiUsageEvent::ATTRIBUTE => AiUsageEvent::CALL_TRANSCRIPTION])
             // One more attempt for a dropped connection, a rate limit or a 5xx.
             ->retry(2, 2000, fn (Throwable $e) => $e instanceof ConnectionException
                 || ($e instanceof RequestException && ($e->response->serverError() || $e->response->status() === 429)), throw: false)

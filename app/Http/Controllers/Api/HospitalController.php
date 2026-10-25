@@ -10,15 +10,16 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class HospitalController extends Controller
 {
+    /** Hospitals patients can see: hidden ones are left out (audit L2b step 3). */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Hospital::query();
-        if ($request->has('search')) {
-            $search = $request->query('search');
-            $query->where('name', 'LIKE', "%{$search}%")
-                  ->orWhere('address', 'LIKE', "%{$search}%");
-        }
-        $hospitals = $query->orderBy('name', 'asc')->get();
+        $search = trim((string) $request->query('search', ''));
+
+        $hospitals = Hospital::active()
+            ->when($search !== '', fn ($q) => $q->matching($search))
+            ->orderBy('name')
+            ->get();
+
         return HospitalResource::collection($hospitals);
     }
 }

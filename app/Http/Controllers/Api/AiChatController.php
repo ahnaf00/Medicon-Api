@@ -7,6 +7,7 @@ use App\Http\Resources\AiChatMessageResource;
 use App\Http\Resources\AiChatSessionResource;
 use App\Models\AiChatMessage;
 use App\Models\AiChatSession;
+use App\Models\AiUsageEvent;
 use App\Services\GeminiEndpoint;
 use App\Services\SymptomTriageService;
 use App\Support\ExecutionTime;
@@ -108,6 +109,7 @@ class AiChatController extends Controller
             // Key in the header, never in the URL, so it cannot reach logs (audit SEC-007).
             $response = Http::timeout(30)
                 ->withHeaders(['x-goog-api-key' => $apiKey])
+                ->withAttributes([AiUsageEvent::ATTRIBUTE => AiUsageEvent::CHAT])
                 ->post(GeminiEndpoint::generate(), [
                     'system_instruction' => [
                         'parts' => [

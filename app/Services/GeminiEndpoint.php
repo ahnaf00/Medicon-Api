@@ -9,7 +9,9 @@ namespace App\Services;
  */
 class GeminiEndpoint
 {
-    private const BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
+    public const HOST = 'generativelanguage.googleapis.com';
+
+    private const BASE = 'https://'.self::HOST.'/v1beta/models/';
 
     public static function generate(): string
     {
@@ -19,6 +21,12 @@ class GeminiEndpoint
     public static function stream(): string
     {
         return self::BASE.self::model().':streamGenerateContent?alt=sse';
+    }
+
+    /** Whether a URL is a call to the Gemini API (used to count AI usage). */
+    public static function isGemini(string $url): bool
+    {
+        return parse_url($url, PHP_URL_HOST) === self::HOST;
     }
 
     public static function model(): string

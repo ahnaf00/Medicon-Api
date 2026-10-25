@@ -11,7 +11,9 @@ use App\Http\Controllers\Api\ConsultationTranscriptController;
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\Admin\AuditLogController;
 use App\Http\Controllers\Api\Admin\DoctorApprovalController;
+use App\Http\Controllers\Api\Admin\HospitalController as AdminHospitalController;
 use App\Http\Controllers\Api\Admin\OverviewController;
+use App\Http\Controllers\Api\Admin\SystemHealthController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\VisitController as AdminVisitController;
 use App\Http\Controllers\Api\ConversationController;
@@ -124,6 +126,21 @@ Route::prefix('v1')->group(function () {
             Route::get('/audit-log', [AuditLogController::class, 'index']);
             Route::get('/visits', [AdminVisitController::class, 'index']);
             Route::get('/visits/{id}', [AdminVisitController::class, 'show'])->whereNumber('id');
+            // Hospitals are hidden, never deleted (L2b step 3).
+            Route::get('/hospitals', [AdminHospitalController::class, 'index']);
+            Route::post('/hospitals', [AdminHospitalController::class, 'store']);
+            Route::get('/hospitals/{id}', [AdminHospitalController::class, 'show'])->whereNumber('id');
+            Route::put('/hospitals/{id}', [AdminHospitalController::class, 'update'])->whereNumber('id');
+            Route::post('/hospitals/{id}/deactivate', [AdminHospitalController::class, 'deactivate'])->whereNumber('id');
+            Route::post('/hospitals/{id}/reactivate', [AdminHospitalController::class, 'reactivate'])->whereNumber('id');
+            // System health (L2b step 3): what failed and a way to start it again, never its content.
+            Route::get('/system/ai-usage', [SystemHealthController::class, 'aiUsage']);
+            Route::get('/system/transcripts/failed', [SystemHealthController::class, 'failedTranscripts']);
+            Route::post('/system/transcripts/{id}/retry', [SystemHealthController::class, 'retryTranscript'])
+                ->whereNumber('id')->middleware('throttle:ai');
+            Route::get('/system/failed-jobs', [SystemHealthController::class, 'failedJobs']);
+            Route::post('/system/failed-jobs/{uuid}/retry', [SystemHealthController::class, 'retryJob'])->whereUuid('uuid');
+            Route::delete('/system/failed-jobs/{uuid}', [SystemHealthController::class, 'discardJob'])->whereUuid('uuid');
             Route::get('/summary', [DoctorApprovalController::class, 'summary']);
             Route::get('/doctors', [DoctorApprovalController::class, 'index']);
             Route::get('/doctors/{id}', [DoctorApprovalController::class, 'show'])->whereNumber('id');

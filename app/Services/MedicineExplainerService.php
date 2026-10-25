@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AiUsageEvent;
 use App\Models\Prescription;
 use App\Models\PrescriptionItem;
 use Illuminate\Support\Facades\Http;
@@ -75,6 +76,7 @@ PROMPT;
         try {
             $response = Http::timeout(15)
                 ->withHeaders(['x-goog-api-key' => $apiKey])
+                ->withAttributes([AiUsageEvent::ATTRIBUTE => AiUsageEvent::MEDICINE_EXPLAINER])
                 ->post(GeminiEndpoint::generate(), [
                     'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT]]],
                     'contents' => [[

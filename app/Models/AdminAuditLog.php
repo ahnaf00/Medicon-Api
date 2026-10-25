@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use InvalidArgumentException;
 use LogicException;
 
 /**
@@ -21,6 +22,27 @@ class AdminAuditLog extends Model
 
     public const USER_REACTIVATED = 'user.reactivated';
 
+    public const HOSPITAL_CREATED = 'hospital.created';
+
+    public const HOSPITAL_UPDATED = 'hospital.updated';
+
+    public const HOSPITAL_DEACTIVATED = 'hospital.deactivated';
+
+    public const HOSPITAL_REACTIVATED = 'hospital.reactivated';
+
+    public const TRANSCRIPT_RETRIED = 'transcript.retried';
+
+    public const JOB_RETRIED = 'job.retried';
+
+    public const JOB_DISCARDED = 'job.discarded';
+
+    /** What a row can point at, stored as `target_type`. */
+    public const TARGET_TYPES = [
+        User::class => 'user',
+        Hospital::class => 'hospital',
+        Appointment::class => 'visit',
+    ];
+
     protected $fillable = ['admin_user_id', 'action', 'target_type', 'target_id', 'reason', 'meta'];
 
     protected function casts(): array
@@ -34,14 +56,22 @@ class AdminAuditLog extends Model
         static::deleting(fn () => throw new LogicException('Admin audit log rows cannot be deleted.'));
     }
 
-    /** @param  array<string, mixed>  $meta */
-    public static function record(User $admin, string $action, ?User $target = null, ?string $reason = null, array $meta = []): self
+    /**
+     * Rows point at the target by type and id only, so a purged name is never copied here.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    public static function record(User $admin, string $action, ?Model $target = null, ?string $reason = null, array $meta = []): self
     {
+        if ($target && ! isset(self::TARGET_TYPES[$target::class])) {
+            throw new InvalidArgumentException('The admin audit log cannot point at '.$target::class.'.');
+        }
+
         return self::create([
             'admin_user_id' => $admin->id,
             'action' => $action,
-            'target_type' => $target ? 'user' : null,
-            'target_id' => $target?->id,
+            'target_type' => $target ? self::TARGET_TYPES[$target::class] : null,
+            'target_id' => $target?->getKey(),
             'reason' => $reason,
             'meta' => $meta ?: null,
         ]);
@@ -50,10 +80,5 @@ class AdminAuditLog extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(User::class, 'admin_user_id')->withTrashed();
-    }
-
-    public function targetUser(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'target_id')->withTrashed();
     }
 }

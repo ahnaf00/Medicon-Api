@@ -3,8 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AiChatMessage;
-use App\Models\AiTriageLog;
+use App\Models\AiUsageEvent;
 use App\Models\Appointment;
 use App\Models\ConsultationTranscript;
 use App\Models\DoctorProfile;
@@ -71,9 +70,12 @@ class OverviewController extends Controller
             'transcripts' => [
                 'failed' => ConsultationTranscript::where('status', 'failed')->count(),
             ],
+            'jobs' => [
+                'failed' => DB::table(config('queue.failed.table', 'failed_jobs'))->count(),
+            ],
+            // Every call to the AI service from any feature (audit L2b step 3).
             'ai' => [
-                'requestsToday' => AiChatMessage::where('role', 'user')->where('created_at', '>=', $todayStartUtc)->count()
-                    + AiTriageLog::where('created_at', '>=', $todayStartUtc)->count(),
+                'requestsToday' => AiUsageEvent::where('created_at', '>=', $todayStartUtc)->count(),
             ],
             'generatedAt' => now()->toIso8601String(),
         ]);

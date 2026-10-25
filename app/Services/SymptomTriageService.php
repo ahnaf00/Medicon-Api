@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AiUsageEvent;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -253,6 +254,7 @@ PROMPT;
         try {
             $response = Http::timeout(15)
                 ->withHeaders(['x-goog-api-key' => $apiKey])
+                ->withAttributes([AiUsageEvent::ATTRIBUTE => AiUsageEvent::SYMPTOM_CHECK])
                 ->post(GeminiEndpoint::generate(), [
                     'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT]]],
                     'contents' => [['parts' => [['text' => $query]]]],

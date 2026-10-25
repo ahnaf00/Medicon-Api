@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AiChatMessage;
+use App\Models\AiUsageEvent;
 use App\Models\Appointment;
 use Generator;
 use Illuminate\Support\Collection;
@@ -77,6 +78,7 @@ PROMPT;
 
         $response = Http::timeout(60)
             ->withHeaders(['x-goog-api-key' => $apiKey])
+            ->withAttributes([AiUsageEvent::ATTRIBUTE => AiUsageEvent::CONSULTATION_CHAT])
             ->withOptions(['stream' => true])
             ->post(GeminiEndpoint::stream(), [
                 'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT."\n\n".$this->context($appointment)]]],

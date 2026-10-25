@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AiUsageEvent;
 use App\Models\LabResult;
 use App\Models\MedicalRecord;
 use App\Models\MedicalRecordPage;
@@ -81,6 +82,7 @@ PROMPT;
 
         $response = Http::timeout(60)
             ->withHeaders(['x-goog-api-key' => $apiKey])
+            ->withAttributes([AiUsageEvent::ATTRIBUTE => AiUsageEvent::REPORT_ANALYSIS])
             ->post(GeminiEndpoint::generate(), [
                 'system_instruction' => ['parts' => [['text' => self::SYSTEM_PROMPT]]],
                 'contents' => [['parts' => $this->pageParts($record)]],

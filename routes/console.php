@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AiUsageEvent;
 use App\Models\Appointment;
 use App\Models\ConsultationTranscript;
 use App\Models\Prescription;
@@ -229,5 +230,8 @@ Artisan::command('accounts:purge', function (AccountDeletionService $accounts) {
 Schedule::command('accounts:purge')->dailyAt('03:00');
 
 Schedule::command('transcripts:finalize-stale')->hourly();
+
+// AI usage rows are counts only; keep 90 days for System health (audit L2b step 3).
+Schedule::command('model:prune', ['--model' => [AiUsageEvent::class]])->dailyAt('03:30');
 
 Schedule::command('prescriptions:complete-ended')->dailyAt('00:10')->timezone(DoctorSlotService::timezone());

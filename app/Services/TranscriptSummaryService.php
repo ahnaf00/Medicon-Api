@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AiUsageEvent;
 use App\Models\ConsultationTranscript;
 use App\Models\ConsultationTranscriptSegment;
 use Illuminate\Http\Client\ConnectionException;
@@ -81,6 +82,7 @@ PROMPT;
 
         $response = Http::timeout(90)
             ->withHeaders(['x-goog-api-key' => $apiKey])
+            ->withAttributes([AiUsageEvent::ATTRIBUTE => AiUsageEvent::CALL_SUMMARY])
             ->retry(2, 2000, fn (Throwable $e) => $e instanceof ConnectionException
                 || ($e instanceof RequestException && ($e->response->serverError() || $e->response->status() === 429)), throw: false)
             ->post(GeminiEndpoint::generate(), [
