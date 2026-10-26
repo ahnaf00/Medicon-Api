@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -51,6 +53,14 @@ class DoctorProfile extends Model
         return $this->is_online
             && $this->last_seen_at !== null
             && $this->last_seen_at->gt(now()->subMinutes(self::PRESENCE_TTL_MINUTES));
+    }
+
+    /** The same rule as isOnlineNow(), as a query, so lists can filter on the server (H3). */
+    #[Scope]
+    protected function onlineNow(Builder $query): void
+    {
+        $query->where('is_online', true)
+            ->where('last_seen_at', '>', now()->subMinutes(self::PRESENCE_TTL_MINUTES));
     }
 
     public function user(): BelongsTo

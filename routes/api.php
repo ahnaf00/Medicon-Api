@@ -66,6 +66,7 @@ Route::prefix('v1')->group(function () {
 
     // Publicly search nearby hospitals & emergency facilities
     Route::get('/hospitals', [HospitalController::class, 'index']);
+    Route::get('/hospitals/{id}', [HospitalController::class, 'show'])->whereNumber('id');
 
     // Transcriber agent (tools/transcriber): not a user, authenticated by the
     // shared X-Transcriber-Secret instead of Sanctum.

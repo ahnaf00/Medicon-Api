@@ -13,10 +13,16 @@ use Illuminate\Validation\Rule;
 
 class DoctorController extends Controller
 {
+    /**
+     * Verified doctors A-Z, 20 per page (audit DB-003 / H3). `online=1` keeps only
+     * doctors online right now, so the app no longer has to load everyone to filter.
+     */
     public function index(Request $request): AnonymousResourceCollection
     {
         $request->validate([
             'specialty' => ['nullable', 'string', Rule::in(SymptomTriageService::SPECIALTIES)],
+            'online' => ['nullable', 'boolean'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
         $doctors = User::verifiedDoctors()
@@ -25,7 +31,13 @@ class DoctorController extends Controller
                 'doctorProfile',
                 fn ($p) => $p->where('specialty', $specialty),
             ))
-            ->get();
+            ->when($request->boolean('online'), fn ($q) => $q->whereHas(
+                'doctorProfile',
+                fn ($p) => $p->onlineNow(),
+            ))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->paginate($request->integer('per_page', 20));
 
         return PublicDoctorResource::collection($doctors);
     }
