@@ -96,6 +96,7 @@ Route::prefix('v1')->group(function () {
 
         // --- Appointments Domain ---
         Route::get('/appointments', [AppointmentController::class, 'index']);
+        Route::get('/appointments/{id}', [AppointmentController::class, 'show'])->whereNumber('id');
         Route::patch('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
         Route::get('/consultations/{appointmentId}/summary', [ConsultationController::class, 'show']);
         Route::get('/consultations/{appointmentId}/transcript', [ConsultationTranscriptController::class, 'show']);

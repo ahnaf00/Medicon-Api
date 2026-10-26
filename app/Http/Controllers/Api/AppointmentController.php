@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AppointmentLifecycle;
 use App\Services\DoctorSlotService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -19,26 +20,72 @@ use Illuminate\Validation\ValidationException;
 
 class AppointmentController extends Controller
 {
+    /** Statuses of a visit that is still ahead or running. */
+    private const OPEN_STATUSES = ['scheduled', 'in_progress'];
+
+    /**
+     * The caller's visits, 20 per page (audit DB-003 / H3).
+     * - `when=upcoming`: scheduled or in progress, soonest first.
+     * - `when=past`: everything else, newest first.
+     * - no `when`: all visits, newest first.
+     * - `from` / `to` (ISO-8601 instants): only visits starting in [from, to), soonest first.
+     * - `status`, `patient_user_id`: narrow further. Ownership scoping always applies.
+     */
     public function index(Request $request):AnonymousResourceCollection
     {
-        $user = $request->user();
+        $request->validate([
+            'when' => ['nullable', 'in:upcoming,past'],
+            'status' => ['nullable', 'in:scheduled,in_progress,completed,cancelled,no_show,expired'],
+            'patient_user_id' => ['nullable', 'integer'],
+            'from' => ['nullable', 'date', 'required_with:to'],
+            'to' => ['nullable', 'date', 'after:from', 'required_with:from'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
 
-        $appointments = Appointment::with(['doctor.doctorProfile', 'patient.patientProfile'])
-            ->orderBy('appointment_datetime','asc');
+        $appointments = $this->scopedToCaller(Appointment::query(), $request->user())
+            ->with(['doctor.doctorProfile', 'patient.patientProfile'])
+            ->when($request->when === 'upcoming', fn ($q) => $q->whereIn('status', self::OPEN_STATUSES))
+            ->when($request->when === 'past', fn ($q) => $q->whereNotIn('status', self::OPEN_STATUSES))
+            ->when($request->status, fn ($q, $status) => $q->where('status', $status))
+            ->when($request->patient_user_id, fn ($q, $id) => $q->where('patient_user_id', $id))
+            ->when($request->from, fn ($q) => $q
+                ->where('appointment_datetime', '>=', Carbon::parse($request->from)->utc())
+                ->where('appointment_datetime', '<', Carbon::parse($request->to)->utc()));
 
-        if($user->hasRole('doctor'))
-        {
-            $appointments->where('doctor_user_id',$user->id)->withExists('consultationSummary');
+        $soonestFirst = $request->when === 'upcoming' || $request->filled('from');
+        $appointments->orderBy('appointment_datetime', $soonestFirst ? 'asc' : 'desc')
+            ->orderBy('id', $soonestFirst ? 'asc' : 'desc');
+
+        return AppointmentResource::collection($appointments->paginate($request->integer('per_page', 20)));
+    }
+
+    /** One visit, for either person in it (H3: screens no longer search the whole list). */
+    public function show(Request $request, int $id): AppointmentResource
+    {
+        $appointment = Appointment::with(['doctor.doctorProfile', 'patient.patientProfile'])->findOrFail($id);
+
+        Gate::authorize('view', $appointment);
+
+        // The doctor sees a draft summary; the patient only a published one (audit G7).
+        $appointment->loadExists((int) $appointment->doctor_user_id === (int) $request->user()->id
+            ? 'consultationSummary'
+            : ['consultationSummary' => fn ($q) => $q->whereNotNull('published_at')]);
+
+        return new AppointmentResource($appointment);
+    }
+
+    /**
+     * A doctor sees the visits they hold as the doctor; anyone else sees their own as the
+     * patient. Also adds `has_summary` (a patient only counts a published summary, audit G7).
+     */
+    private function scopedToCaller(Builder $query, User $user): Builder
+    {
+        if ($user->hasRole('doctor')) {
+            return $query->where('doctor_user_id', $user->id)->withExists('consultationSummary');
         }
-        else
-        {
-            // A draft summary does not exist for the patient yet (audit G7).
-            $appointments->where('patient_user_id',$user->id)
-                ->withExists(['consultationSummary' => fn ($q) => $q->whereNotNull('published_at')]);
-        }
 
-        return AppointmentResource::collection($appointments->get());
-
+        return $query->where('patient_user_id', $user->id)
+            ->withExists(['consultationSummary' => fn ($q) => $q->whereNotNull('published_at')]);
     }
 
     public function store(StoreAppointmentRequest $request, DoctorSlotService $slots):JsonResponse

@@ -12,11 +12,17 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class VitalController extends Controller
 {
+    /** The caller's readings, newest first, 20 per page (audit DB-003 / H3). */
     public function index(Request $request): AnonymousResourceCollection
     {
+        $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
         $vitals = Vital::where('user_id', $request->user()->id)
             ->orderBy('logged_at', 'desc')
-            ->get();
+            ->orderBy('id', 'desc')
+            ->paginate($request->integer('per_page', 20));
         return VitalResource::collection($vitals);
     }
 

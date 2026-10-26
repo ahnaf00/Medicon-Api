@@ -106,11 +106,12 @@ describe('reading', function () {
         putSummary($this->doctor, $this->appointment, summaryPayload(['publish' => true]))->assertCreated();
         bookAppointment($this->patient, $this->doctor)->update(['appointment_datetime' => '2026-10-06 03:00:00']);
 
+        // The list is newest first (H3): the 6 Oct visit, then the 5 Oct one with the summary.
         $this->actingAs($this->patient, 'sanctum')
             ->getJson('/api/v1/appointments')
             ->assertOk()
-            ->assertJsonPath('data.0.hasSummary', true)
-            ->assertJsonPath('data.1.hasSummary', false);
+            ->assertJsonPath('data.0.hasSummary', false)
+            ->assertJsonPath('data.1.hasSummary', true);
     });
 });
 

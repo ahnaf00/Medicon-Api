@@ -30,11 +30,22 @@ class PrescriptionController extends Controller
 
     public const ALLERGY_WARNING = 'A medicine matches an allergy on the patient\'s profile. Check it, then confirm to prescribe anyway.';
 
+    /**
+     * The caller's prescriptions, newest first, 20 per page (audit DB-003 / H3).
+     * `status` (active | completed | cancelled) and `patient_user_id` narrow the list;
+     * ownership scoping always applies.
+     */
     public function index(Request $request):AnonymousResourceCollection
     {
+        $request->validate([
+            'status' => ['nullable', 'in:active,completed,cancelled'],
+            'patient_user_id' => ['nullable', 'integer'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
         $user = $request->user();
 
-        $prescriptions = Prescription::with(self::RELATIONS)->latest();
+        $prescriptions = Prescription::with(self::RELATIONS)->latest()->orderByDesc('id');
 
         if($user->hasRole('doctor'))
         {
@@ -44,7 +55,12 @@ class PrescriptionController extends Controller
         {
             $prescriptions->where('patient_user_id',$user->id);
         }
-        return PrescriptionResource::collection($prescriptions->get());
+
+        $prescriptions
+            ->when($request->status, fn ($q, $status) => $q->where('status', $status))
+            ->when($request->patient_user_id, fn ($q, $id) => $q->where('patient_user_id', $id));
+
+        return PrescriptionResource::collection($prescriptions->paginate($request->integer('per_page', 20)));
     }
 
     public function store(StorePrescriptionRequest $request, MedicineExplainerService $explainer): JsonResponse
