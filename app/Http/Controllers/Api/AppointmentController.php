@@ -57,7 +57,7 @@ class AppointmentController extends Controller
         $doctorId = (int) $validated['doctor_user_id'];
 
         // Lock the doctor's row so two patients can't take the same slot at once.
-        $appointment = DB::transaction(function () use ($request, $validated, $doctorId, $start, $slots) {
+        $appointment = self::slotTransaction(function () use ($request, $validated, $doctorId, $start, $slots) {
             $doctor = User::verifiedDoctors()->whereKey($doctorId)->lockForUpdate()->first();
 
             if (! $doctor || ! $slots->isBookable($doctorId, $start)) {
@@ -156,7 +156,7 @@ class AppointmentController extends Controller
 
         $start = Carbon::parse($validated['appointment_datetime'], DoctorSlotService::timezone())->utc();
 
-        $appointment = DB::transaction(function () use ($request, $slots, $id, $start) {
+        $appointment = self::slotTransaction(function () use ($request, $slots, $id, $start) {
             $appointment = Appointment::lockForUpdate()->findOrFail($id);
 
             Gate::authorize('reschedule', $appointment);
@@ -223,6 +223,25 @@ class AppointmentController extends Controller
                 'appointment_datetime' => "You already have a visit with {$clash->doctor?->name} at {$at}. Choose another time.",
             ]);
         }
+    }
+
+    /**
+     * A transaction for "lock, then check the slot is still free" (task B3).
+     *
+     * MySQL's default REPEATABLE READ fixes a snapshot at the transaction's
+     * first plain read (here the role or cache lookup before the lock), so a
+     * request that waited for the lock would still miss the visit the winner
+     * just booked, and both would succeed. READ COMMITTED makes every read see
+     * the latest committed rows. MySQL can't change it inside an open
+     * transaction, so it is set only at the outer level.
+     */
+    private static function slotTransaction(\Closure $callback): mixed
+    {
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true) && DB::transactionLevel() === 0) {
+            DB::statement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+        }
+
+        return DB::transaction($callback);
     }
 
     private static function cutOffMessage(): string
